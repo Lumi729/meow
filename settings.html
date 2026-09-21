@@ -1,0 +1,38 @@
+<section id="meow-panel" aria-label="Meow 猫猫星绘">
+  <details open>
+    <summary><span aria-hidden="true">ฅ^•ﻌ•^ฅ</span> Meow · 猫猫星绘 <span aria-hidden="true">✦</span></summary>
+    <div class="meow-body">
+      <p class="meow-tagline">把小小的想象，画成闪闪的星星。</p>
+      <details class="meow-config">
+        <summary>✧ 连接 NovelAI</summary>
+        <p id="meow-key-status"></p>
+        <label for="meow-token">Persistent API Token</label>
+        <input id="meow-token" type="password" autocomplete="off" spellcheck="false" placeholder="仅在你的酒馆中填写">
+        <button id="meow-save-token" type="button">保存本地 Token</button>
+        <small>与酒馆共用 NovelAI 密钥。仅保存到你运行酒馆的服务器，不写入扩展设置或 GitHub。可在酒馆密钥管理中删除。请勿填写账号密码。</small>
+      </details>
+      <form id="meow-form">
+        <label for="meow-prompt">✦ 想画什么？</label>
+        <textarea id="meow-prompt" rows="4" required placeholder="a fluffy white cat, pink bow, twinkling stars, pastel colors"></textarea>
+        <label for="meow-negative_prompt">不想出现的内容</label>
+        <textarea id="meow-negative_prompt" rows="2" placeholder="blurry, low quality"></textarea>
+        <label for="meow-model">模型</label><select id="meow-model"></select>
+        <div class="meow-grid">
+          <label>宽度<input id="meow-width" type="number" min="64" max="2048" step="64" required></label>
+          <label>高度<input id="meow-height" type="number" min="64" max="2048" step="64" required></label>
+          <label>步数<input id="meow-steps" type="number" min="1" max="28" step="1" required></label>
+          <label>提示词引导<input id="meow-scale" type="number" min="0" max="10" step="0.1" required></label>
+        </div>
+        <label for="meow-seed">种子（-1 为随机）</label><input id="meow-seed" type="number" min="-1" max="4294967295" step="1" required>
+        <small>每次生成 1 张，可能消耗 Anlas。基础版限制为 ≤28 步、≤1,048,576 像素，不保证免费。</small>
+        <button id="meow-generate" type="submit">✦ 猫猫，开始画画</button>
+      </form>
+      <p id="meow-status" role="status" aria-live="polite">准备好就开始吧 ♡</p>
+      <div id="meow-result" hidden>
+        <img id="meow-preview" alt="NovelAI 生成的图片">
+        <small id="meow-seed-used"></small>
+        <a id="meow-download" download="meow.png">↓ 保存 PNG</a>
+      </div>
+    </div>
+  </details>
+</section>

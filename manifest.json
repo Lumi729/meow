@@ -1,0 +1,12 @@
+{
+  "display_name": "Meow · 猫猫星绘",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Lumi729",
+  "version": "0.1.0",
+  "homePage": "https://github.com/Lumi729/meow",
+  "minimum_client_version": "1.19.0"
+}

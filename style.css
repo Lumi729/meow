@@ -1,0 +1,21 @@
+#meow-panel { --meow-ink: #684451; --meow-pink: #f3b8cc; margin: 12px 0; color: var(--meow-ink); background: #fff8fb; border: 1px solid #edc3d2; border-radius: 20px; overflow: hidden; font-family: inherit; text-shadow: none; box-shadow: 0 4px 18px #d489a31a; }
+#meow-panel * { box-sizing: border-box; }
+#meow-panel summary { cursor: pointer; padding: 14px; font-weight: 650; }
+#meow-panel > details > summary { background: linear-gradient(120deg, #ffe3ee, #fffafc); font-size: 1.08em; }
+#meow-panel .meow-body { padding: 0 16px 16px; }
+#meow-panel .meow-tagline { font-size: .88em; color: #946075; }
+#meow-panel .meow-config { border: 1px dashed #dfb5c6; border-radius: 12px; padding: 0 10px 10px; margin-bottom: 16px; }
+#meow-panel .meow-config summary { padding-left: 0; }
+#meow-panel label { display: block; margin-top: 10px; font-size: .9em; }
+#meow-panel input, #meow-panel textarea, #meow-panel select { display: block; width: 100%; min-width: 0; margin: 6px 0 10px; padding: 10px; color: #533541; background: #fff; border: 1px solid #ddb6c5; border-radius: 10px; font: inherit; box-shadow: none; }
+#meow-panel textarea { resize: vertical; }
+#meow-panel input::placeholder, #meow-panel textarea::placeholder { color: #997986; opacity: 1; }
+#meow-panel .meow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+#meow-panel button, #meow-panel a { display: block; width: 100%; text-align: center; padding: 11px; margin-top: 12px; border: 1px solid #d8a2b7; border-radius: 12px; background: #ffe2ed; color: #66394c; font: inherit; text-decoration: none; cursor: pointer; }
+#meow-panel button:hover, #meow-panel a:hover { background: #ffd3e3; }
+#meow-panel :focus-visible { outline: 3px solid #a85979; outline-offset: 2px; }
+#meow-panel button:disabled { opacity: .6; cursor: wait; }
+#meow-panel small { display: block; font-size: .78em; line-height: 1.6; color: #856170; }
+#meow-panel #meow-status { font-size: .88em; line-height: 1.6; overflow-wrap: anywhere; }
+#meow-panel #meow-preview { width: 100%; height: auto; border-radius: 12px; }
+#meow-panel [hidden] { display: none !important; }
