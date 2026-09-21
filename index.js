@@ -1,5 +1,5 @@
 import { DEFAULTS, MODELS, buildRequest, requestImage } from './core.js';
-import { SECRET_KEYS, secret_state, writeSecret } from '../../secrets.js';
+import { SECRET_KEYS, secret_state, writeSecret } from '../../../secrets.js';
 
 const context = () => SillyTavern.getContext();
 const folder = new URL('.', import.meta.url).pathname.split('/').filter(Boolean).slice(-2).join('/');
