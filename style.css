@@ -19,3 +19,13 @@
 #meow-panel #meow-status { font-size: .88em; line-height: 1.6; overflow-wrap: anywhere; }
 #meow-panel #meow-preview { width: 100%; height: auto; border-radius: 12px; }
 #meow-panel [hidden] { display: none !important; }
+
+/* Independent page-like dialog, outside the extensions drawer. */
+#meow-dialog { width: min(620px, calc(100vw - 20px)); max-width: none; max-height: calc(100dvh - 24px); margin: auto; padding: 12px; border: 1px solid #edc3d2; border-radius: 24px; background: #fff8fb; color: #684451; overflow: auto; overscroll-behavior: contain; box-shadow: 0 16px 70px #50334544; }
+#meow-dialog::backdrop { background: #3c263a80; backdrop-filter: blur(4px); }
+#meow-dialog .meow-close { display: block; position: sticky; top: 0; z-index: 1; margin-left: auto; border: 1px solid #ddb6c5; border-radius: 20px; padding: 8px 14px; background: #fff2f7; color: #684451; cursor: pointer; }
+#meow-dialog #meow-panel { margin: 8px 0 0; box-shadow: none; }
+#meow-floating { position: fixed; right: 18px; bottom: 110px; z-index: 30000; display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 2px solid #fff; border-radius: 50%; background: #f9d0e0; color: #79475d; font: bold 28px sans-serif; box-shadow: 0 4px 18px #a9688960; cursor: pointer; touch-action: none; user-select: none; }
+#meow-floating:focus-visible, #meow-dialog .meow-close:focus-visible { outline: 3px solid #a85979; outline-offset: 3px; }
+#meow-wand-button { width: 100%; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+#meow-open-settings { display: block; margin: 12px 0; padding: 12px; border: 1px solid #ddb6c5; border-radius: 12px; background: #fff2f7; color: #684451; cursor: pointer; }

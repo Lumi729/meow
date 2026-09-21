@@ -1,3 +1,4 @@
+import { mountPanel } from './panel.js';
 import { DEFAULTS, MODELS, buildRequest, requestImage } from './core.js';
 import { SECRET_KEYS, secret_state, writeSecret } from '../../../secrets.js';
 
@@ -5,10 +6,8 @@ const context = () => SillyTavern.getContext();
 const folder = new URL('.', import.meta.url).pathname.split('/').filter(Boolean).slice(-2).join('/');
 async function init() {
     if (document.getElementById('meow-panel')) return;
-    const host = document.querySelector('#extensions_settings2') || document.querySelector('#extensions_settings');
-    if (!host) return;
     const markup = await context().renderExtensionTemplateAsync(folder, 'settings');
-    host.insertAdjacentHTML('beforeend', markup);
+    mountPanel(markup);
     const root = document.getElementById('meow-panel');
     const el = id => root.querySelector(`#meow-${id}`);
     const settings = context().extensionSettings.meow = Object.fromEntries(Object.entries(DEFAULTS).map(([key, value]) => [key, context().extensionSettings.meow?.[key] ?? value]));
