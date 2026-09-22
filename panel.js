@@ -43,7 +43,8 @@ export function mountPanel(markup) {
         const item = document.createElement('div');
         item.id = 'meow-wand-entry';
         const button = makeButton('meow-wand-button', '✦ Meow · 猫猫星绘');
-        button.className = 'extensionsMenuExtensionButton';
+        button.removeEventListener('click', open);
+        item.addEventListener('click', open);
         item.append(button);
         menu.append(item);
     }
@@ -53,6 +54,18 @@ export function mountPanel(markup) {
     floating.title = '猫猫星绘 · 点击打开，拖动移动';
     document.body.append(floating);
     const ctx = () => SillyTavern.getContext();
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.id = 'meow-reset-floating';
+    reset.textContent = 'ฅ 找回猫猫悬浮按钮';
+    reset.addEventListener('click', () => {
+        floating.style.left = floating.style.top = 'auto';
+        floating.style.right = '18px';
+        floating.style.bottom = '110px';
+        delete ctx().extensionSettings.meow_launcher;
+        ctx().saveSettingsDebounced();
+    });
+    settings?.append(reset);
     const clamp = (v, max) => Math.min(Math.max(8, v), Math.max(8, max));
     const place = (x, y) => {
         floating.style.left = `${clamp(x, innerWidth - floating.offsetWidth - 8)}px`;

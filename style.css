@@ -29,3 +29,6 @@
 #meow-floating:focus-visible, #meow-dialog .meow-close:focus-visible { outline: 3px solid #a85979; outline-offset: 3px; }
 #meow-wand-button { width: 100%; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 #meow-open-settings { display: block; margin: 12px 0; padding: 12px; border: 1px solid #ddb6c5; border-radius: 12px; background: #fff2f7; color: #684451; cursor: pointer; }
+
+#meow-wand-button { pointer-events: auto; height: auto; min-height: 32px; display: block; }
+#meow-reset-floating { margin: 6px 0; padding: 10px; border: 1px solid #ddb6c5; border-radius: 12px; background: #fff2f7; color: #684451; cursor: pointer; }
