@@ -1,6 +1,6 @@
 process.on('uncaughtException',e=>{console.error(e.message);console.error(e.stack?.split('\n').filter(x=>!x.includes('data:text')).join('\n'));process.exit(1)});
 import { Window } from 'happy-dom';
-import { indexedDB } from 'fake-indexeddb';
+import { indexedDB, IDBDatabase } from 'fake-indexeddb';
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
@@ -45,11 +45,20 @@ field('prompt','white cat');field('fixed_positive','pastel');field('preset-name'
 let calls=[];
 globalThis.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});if(url.includes('chat-completions'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'a white cat',source_ids:['m0p0']}]})}}]}));return new Response('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');};
 click('capture');await settle();assert.equal($('context-list').querySelectorAll('input[type=checkbox]').length,2);assert.ok(!$('send-preview').value.includes('private'));
+const choice=$('context-list').querySelector('input');choice.checked=true;choice.dispatchEvent(new Event('change'));
 click('tags');await settle();assert.equal(calls.length,1);assert.ok(!JSON.stringify(calls[0]).includes('do not send private'));assert.equal($('scenes').querySelectorAll('textarea').length,2);
 click('bad-generate');await settle();assert.equal(calls.length,2);assert.equal(calls[1].body.prompt,'pastel, a white cat');assert.equal($('gallery').querySelectorAll('article').length,1);
 $('gallery').querySelector('button').click();await settle();assert.ok($('viewer').open);assert.ok($('viewer').textContent.includes('white cat'));assert.ok(!$('viewer').textContent.includes('private'));
 click('close');assert.equal($('prompt').value,'white cat');
 current='chat-b';await events.chat();click('bad-generate');await settle();assert.equal(calls.length,2);assert.match($('status').textContent,/聊天已切换/);
 const {galleryStore}=await import('../storage.js');const persisted=await galleryStore(extensionSettings.meow_gallery_scope).list();assert.equal(persisted.length,1);assert.equal(persisted[0].source[0].text,'<正文>white cat</正文>');await galleryStore(extensionSettings.meow_gallery_scope).remove(persisted[0].id);assert.equal((await galleryStore(extensionSettings.meow_gallery_scope).list()).length,0);
+$('viewer').close();
+click('generate');await settle();assert.equal(calls.length,3);assert.equal($('generate').disabled,false);
+click('generate');await settle();assert.equal(calls.length,4);assert.equal($('generate').disabled,false);
+const originalTransaction=IDBDatabase.prototype.transaction;
+IDBDatabase.prototype.transaction=function(){throw new Error('simulated storage failure');};
+click('generate');await settle();assert.equal(calls.length,5);assert.equal($('generate').disabled,false);assert.match($('status').textContent,/存储失败/);
+IDBDatabase.prototype.transaction=originalTransaction;
+click('generate');await settle();assert.equal(calls.length,6);assert.equal($('generate').disabled,false);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();

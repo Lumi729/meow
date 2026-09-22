@@ -30,9 +30,9 @@ export function splitMessage(text,rules=DEFAULT_RULES){
 }
 export function captureContext(chat,count,rules){
     const indexed=chat.map((m,i)=>({...m,index:i})).filter(m=>!m.is_system&&!m.extra?.meow);
-    return indexed.slice(-count).flatMap(m=>splitMessage(m.mes,rules).map((p,j)=>({
+    return indexed.slice(-count).flatMap(m=>splitAutoMessage(m.mes,rules).map((p,j)=>({
         id:`m${m.index}p${j}`,messageIndex:m.index,name:m.name|| (m.is_user?'用户':'角色'),part:p.name,text:p.text,
-        selected:p.name==='正文',
+        selected:!p.automatic&&p.name==='正文',
     })));
 }
 export function parseTagPreset(text,filename=''){
@@ -74,4 +74,29 @@ export function buildTagRequest(config,parts,count){
         model:config.model.trim(),stream:false,temperature:0.7,max_tokens:4096,
         messages:[{role:'system',content:`${config.preset||TAG_PRESET}\n\n输出严格 JSON：{"scenes":[{"title":"标题","prompt":"English tags","negative_prompt":"","source_ids":["原文 id"]}]}。必须恰好 ${count} 幅。source_ids 只能引用用户提供的 id。不要输出代码围栏或解释。`},
         {role:'user',content:JSON.stringify({passages:parts.map(p=>({id:p.id,speaker:p.name,section:p.part,text:p.text}))})}]};
+}
+
+/** Discover balanced XML-style tags without rendering or executing chat HTML. */
+export function splitAutoMessage(value,rules=DEFAULT_RULES){
+ const text=String(value??''),stack=[],ranges=[];
+ const tokens=/<(\/?)([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s+[^<>]*?)?\s*(\/?)>/gu;
+ for(const match of text.matchAll(tokens)){
+  const [raw,closing,name,self]=match;
+  if(self)continue;
+  if(!closing){stack.push({name,a:match.index,openEnd:match.index+raw.length});continue;}
+  const top=stack.at(-1);
+  if(!top||top.name!==name){stack.length=0;continue;}
+  stack.pop();ranges.push({...top,b:match.index+raw.length});
+ }
+ if(!ranges.length)return splitMessage(text,rules);
+ const points=[...new Set([0,text.length,...ranges.flatMap(r=>[r.a,r.b])])].sort((a,b)=>a-b);
+ const parts=[];
+ for(let i=0;i<points.length-1;i++){
+  const a=points[i],b=points[i+1],chunk=text.slice(a,b);
+  if(!chunk)continue;
+  const owner=ranges.filter(r=>r.a<=a&&r.b>=b).sort((x,y)=>(x.b-x.a)-(y.b-y.a))[0];
+  if(owner){parts.push({name:owner.name,text:chunk,automatic:true});}
+  else parts.push(...splitMessage(chunk,rules));
+ }
+ return parts;
 }

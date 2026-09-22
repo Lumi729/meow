@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {splitMessage,captureContext,parseScenes,parseTagPreset,buildTagRequest,apiBase} from '../context.js';
+import {splitMessage,splitAutoMessage,captureContext,parseScenes,parseTagPreset,buildTagRequest,apiBase} from '../context.js';
 import {buildRequest,cleanPreset} from '../core.js';
 test('context delimiters preserve excluded text, with no automatic uncategorized sharing',()=>{
  const parts=splitMessage('before<正文>main</正文><状态栏>private</状态栏>after');
  assert.deepEqual(parts.map(p=>p.name),['未分类原文','正文','状态栏','未分类原文']);
  const capture=captureContext([{mes:'<正文>main</正文><状态栏>private</状态栏>'}],1);
- const sent=buildTagRequest({url:'https://example.com/v1',model:'test'},capture.filter(p=>p.selected),1);
+ const sent=buildTagRequest({url:'https://example.com/v1',model:'test'},capture.filter(p=>p.part==='正文'),1);
  assert.ok(JSON.stringify(sent).includes('main'));assert.ok(!JSON.stringify(sent).includes('private'));
  assert.equal(captureContext([{mes:'no known markers'}],1)[0].selected,false);
 });
@@ -51,4 +51,14 @@ test('official direct protocol keeps one sample and fixed captions',async()=>{
  await assert.rejects(requestDirect(body,'',undefined),/Token/);
  const src=await requestDirect(body,'test-only',undefined,async(url,options)=>{assert.equal(url,'https://image.novelai.net/ai/generate-image');assert.equal(options.headers.Accept,'application/json');return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));});
  assert.ok(src.startsWith('data:image/png;'));
+});
+
+test('automatic tags partition nested content and require explicit selection',()=>{
+ const text='<story class="x">one<状态面板>private</状态面板>two</story><extra>aside</extra>';
+ const parts=splitAutoMessage(text);
+ assert.equal(parts.map(p=>p.text).join(''),text);
+ assert.ok(parts.some(p=>p.name==='状态面板'&&p.text.includes('private')));
+ assert.ok(!parts.filter(p=>p.name==='story').some(p=>p.text.includes('private')));
+ assert.ok(captureContext([{mes:text}],1).every(p=>!p.selected));
+ assert.equal(splitAutoMessage('<broken>text')[0].name,'未分类原文');
 });
