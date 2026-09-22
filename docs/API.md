@@ -50,3 +50,5 @@ Checked official ST source `src/endpoints/backends/chat-completions.js`: POST `/
 
 ## v0.3.6 characters
 Verified https://image.novelai.net/docs/doc.json definitions image.V4ConditionInput, image.V4ExternalCaption, image.V4ExternalCharacterCaption: caption.base_caption, caption.char_captions[].char_caption/centers[], use_coords/use_order. Our auxiliary response schema characters is app-owned and validated; it cannot supply arbitrary endpoint/credentials/parameters. ST 1.19 checked bridge hardcodes empty char_captions, so this workflow explicitly requires direct mode.
+
+0.3.10: removed image transport/model preflight from auxiliary tag generation. Outermost balanced tag pairs are captured whole as requested. NovelAI official Summer Sampler Update confirms DPM++ 2M SDE availability; its wire identifier remains unverified from official sources, so the existing sampler allowlist is unchanged.

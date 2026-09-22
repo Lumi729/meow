@@ -57,8 +57,8 @@ test('automatic tags partition nested content and require explicit selection',()
  const text='<story class="x">one<状态面板>private</状态面板>two</story><extra>aside</extra>';
  const parts=splitAutoMessage(text);
  assert.equal(parts.map(p=>p.text).join(''),text);
- assert.ok(parts.some(p=>p.name==='状态面板'&&p.text.includes('private')));
- assert.ok(!parts.filter(p=>p.name==='story').some(p=>p.text.includes('private')));
+ assert.deepEqual(parts.map(p=>p.name),['story','extra']);
+ assert.equal(parts[0].text,'<story class="x">one<状态面板>private</状态面板>two</story>');
  assert.ok(captureContext([{mes:text}],1).every(p=>!p.selected));
  assert.equal(splitAutoMessage('<broken>text')[0].name,'未分类原文');
 });
@@ -76,4 +76,10 @@ test('character scene validation and official mapping preserve identity and fixe
  assert.ok(!('token' in validateCharacters([{...chars[0],token:'discard'}])[0]));
  const req=buildTagRequest({url:'https://example.com/v1',model:'m',preset:'MY PRESET',character_mode:true},[{id:'m0p0',text:'story'}],1);
  assert.ok(req.messages[0].content.includes('MY PRESET'));assert.ok(req.messages[0].content.includes('characters'));
+});
+
+test('outer paired blocks stay intact with attributes, void tags and repeated pairs',()=>{
+ const text='<details><RoundMemo><history id="A3" t="now">one<br>two</history></RoundMemo></details><history>next</history>';
+ const parts=splitAutoMessage(text);assert.equal(parts.length,2);assert.equal(parts[0].name,'details');assert.equal(parts[1].text,'<history>next</history>');assert.equal(parts.map(p=>p.text).join(''),text);
+ assert.ok(parts.every(p=>!/^\s*<\//.test(p.text)));
 });

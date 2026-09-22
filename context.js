@@ -80,24 +80,24 @@ export function buildTagRequest(config,parts,count){
 /** Discover balanced XML-style tags without rendering or executing chat HTML. */
 export function splitAutoMessage(value,rules=DEFAULT_RULES){
  const text=String(value??''),stack=[],ranges=[];
- const tokens=/<(\/?)([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s+[^<>]*?)?\s*(\/?)>/gu;
+ const tokens=/<!--[\s\S]*?-->|<(\/?)([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s+(?:[^<>"']|"[^"]*"|'[^']*')*?)?\s*(\/?)>/gu;
  for(const match of text.matchAll(tokens)){
   const [raw,closing,name,self]=match;
-  if(self)continue;
+  if(!name||self||['br','hr','img','input','meta','link','source','wbr','area','base','embed','param','track','col'].includes(name.toLowerCase()))continue;
   if(!closing){stack.push({name,a:match.index,openEnd:match.index+raw.length});continue;}
   const top=stack.at(-1);
   if(!top||top.name!==name){stack.length=0;continue;}
   stack.pop();ranges.push({...top,b:match.index+raw.length});
  }
  if(!ranges.length)return splitMessage(text,rules);
- const points=[...new Set([0,text.length,...ranges.flatMap(r=>[r.a,r.b])])].sort((a,b)=>a-b);
- const parts=[];
- for(let i=0;i<points.length-1;i++){
-  const a=points[i],b=points[i+1],chunk=text.slice(a,b);
-  if(!chunk)continue;
-  const owner=ranges.filter(r=>r.a<=a&&r.b>=b).sort((x,y)=>(x.b-x.a)-(y.b-y.a))[0];
-  if(owner){parts.push({name:owner.name,text:chunk,automatic:true});}
-  else parts.push(...splitMessage(chunk,rules));
+ // Keep the outermost balanced pair whole, including all nested tags.
+ ranges.sort((a,b)=>a.a-b.a||b.b-a.b);
+ const parts=[];let cursor=0;
+ for(const range of ranges){
+  if(range.a<cursor)continue;
+  if(range.a>cursor)parts.push(...splitMessage(text.slice(cursor,range.a),rules));
+  parts.push({name:range.name,text:text.slice(range.a,range.b),automatic:true});cursor=range.b;
  }
+ if(cursor<text.length)parts.push(...splitMessage(text.slice(cursor),rules));
  return parts;
 }
