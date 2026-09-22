@@ -1,34 +1,48 @@
-#meow-panel { --meow-ink: #684451; --meow-pink: #f3b8cc; margin: 12px 0; color: var(--meow-ink); background: #fff8fb; border: 1px solid #edc3d2; border-radius: 20px; overflow: hidden; font-family: inherit; text-shadow: none; box-shadow: 0 4px 18px #d489a31a; }
-#meow-panel * { box-sizing: border-box; }
-#meow-panel summary { cursor: pointer; padding: 14px; font-weight: 650; }
-#meow-panel > details > summary { background: linear-gradient(120deg, #ffe3ee, #fffafc); font-size: 1.08em; }
-#meow-panel .meow-body { padding: 0 16px 16px; }
-#meow-panel .meow-tagline { font-size: .88em; color: #946075; }
-#meow-panel .meow-config { border: 1px dashed #dfb5c6; border-radius: 12px; padding: 0 10px 10px; margin-bottom: 16px; }
-#meow-panel .meow-config summary { padding-left: 0; }
-#meow-panel label { display: block; margin-top: 10px; font-size: .9em; }
-#meow-panel input, #meow-panel textarea, #meow-panel select { display: block; width: 100%; min-width: 0; margin: 6px 0 10px; padding: 10px; color: #533541; background: #fff; border: 1px solid #ddb6c5; border-radius: 10px; font: inherit; box-shadow: none; }
-#meow-panel textarea { resize: vertical; }
-#meow-panel input::placeholder, #meow-panel textarea::placeholder { color: #997986; opacity: 1; }
-#meow-panel .meow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
-#meow-panel button, #meow-panel a { display: block; width: 100%; text-align: center; padding: 11px; margin-top: 12px; border: 1px solid #d8a2b7; border-radius: 12px; background: #ffe2ed; color: #66394c; font: inherit; text-decoration: none; cursor: pointer; }
-#meow-panel button:hover, #meow-panel a:hover { background: #ffd3e3; }
-#meow-panel :focus-visible { outline: 3px solid #a85979; outline-offset: 2px; }
-#meow-panel button:disabled { opacity: .6; cursor: wait; }
-#meow-panel small { display: block; font-size: .78em; line-height: 1.6; color: #856170; }
-#meow-panel #meow-status { font-size: .88em; line-height: 1.6; overflow-wrap: anywhere; }
-#meow-panel #meow-preview { width: 100%; height: auto; border-radius: 12px; }
-#meow-panel [hidden] { display: none !important; }
-
-/* Independent page-like dialog, outside the extensions drawer. */
-#meow-dialog { width: min(620px, calc(100vw - 20px)); max-width: none; max-height: calc(100dvh - 24px); margin: auto; padding: 12px; border: 1px solid #edc3d2; border-radius: 24px; background: #fff8fb; color: #684451; overflow: auto; overscroll-behavior: contain; box-shadow: 0 16px 70px #50334544; }
-#meow-dialog::backdrop { background: #3c263a80; backdrop-filter: blur(4px); }
-#meow-dialog .meow-close { display: block; position: sticky; top: 0; z-index: 1; margin-left: auto; border: 1px solid #ddb6c5; border-radius: 20px; padding: 8px 14px; background: #fff2f7; color: #684451; cursor: pointer; }
-#meow-dialog #meow-panel { margin: 8px 0 0; box-shadow: none; }
-#meow-floating { position: fixed; right: 18px; bottom: 110px; z-index: 30000; display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 2px solid #fff; border-radius: 50%; background: #f9d0e0; color: #79475d; font: bold 28px sans-serif; box-shadow: 0 4px 18px #a9688960; cursor: pointer; touch-action: none; user-select: none; }
-#meow-floating:focus-visible, #meow-dialog .meow-close:focus-visible { outline: 3px solid #a85979; outline-offset: 3px; }
-#meow-wand-button { width: 100%; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-#meow-open-settings { display: block; margin: 12px 0; padding: 12px; border: 1px solid #ddb6c5; border-radius: 12px; background: #fff2f7; color: #684451; cursor: pointer; }
-
-#meow-wand-button { pointer-events: auto; height: auto; min-height: 32px; display: block; }
-#meow-reset-floating { margin: 6px 0; padding: 10px; border: 1px solid #ddb6c5; border-radius: 12px; background: #fff2f7; color: #684451; cursor: pointer; }
+#meow-dialog { width: min(680px, calc(100vw - 18px)); max-width: none; max-height: calc(100dvh - 20px); margin: auto; padding: 0; border: 0; border-radius: 22px; background: #fff8fb; color: #674350; overflow: auto; overscroll-behavior: contain; box-shadow: 0 18px 70px #50334544; }
+#meow-dialog::backdrop,#meow-viewer::backdrop { background: #33223285; backdrop-filter: blur(3px); }
+#meow-panel { --meow-ink:#674350; --meow-border:#e8c5d3; padding: 0 18px 16px; margin: 0; background: #fff8fb; color: var(--meow-ink); text-shadow: none; font-family: inherit; }
+#meow-panel *,#meow-viewer * { box-sizing: border-box; }
+#meow-panel .meow-header { padding: 22px 0 12px; }
+#meow-panel h2 { margin: 0; color: #684451; font-size: 1.2em; }
+#meow-panel .meow-header p { margin: 7px 0 0; font-size: .82em; color: #977184; }
+#meow-panel h3 { margin: 18px 0 8px; font-size: 1.02em; }
+#meow-panel .meow-tabs { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; padding: 8px 0; background: #fff8fb; border-bottom: 1px solid #eedce5; }
+#meow-panel .meow-tabs button { padding: 9px 3px; margin: 0; font-size: .86em; }
+#meow-panel .meow-tabs button[aria-pressed=true] { background: #e9aec6; color: #4a2939; border-color:#d795b0; }
+#meow-panel label { display: block; margin-top: 12px; font-size: .88em; }
+#meow-panel input:not([type=checkbox]):not([type=file]):not([type=range]),#meow-panel select,#meow-panel textarea { display: block; width: 100%; min-width:0; margin: 6px 0 9px; padding: 10px; background: #fff; color:#563643; border: 1px solid var(--meow-border); border-radius: 12px; box-shadow:none; font:inherit; text-shadow:none; }
+#meow-panel textarea { resize: vertical; line-height:1.55; }
+#meow-panel input::placeholder,#meow-panel textarea::placeholder { color:#9f798b; opacity:1; }
+#meow-panel input[type=checkbox] { width:18px; height:18px; accent-color:#b66488; margin:0 8px 0 0; vertical-align:middle; }
+#meow-panel input[type=range] { width:100%; accent-color:#b66488; }
+#meow-panel .meow-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 12px; }
+#meow-panel .meow-row,#meow-viewer .meow-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+#meow-panel button,#meow-panel .meow-file,#meow-viewer button,#meow-viewer a { display:block; padding:10px 12px; margin:10px 0; border:1px solid #ddb3c5; border-radius:12px; background:#ffe6ef; color:#674350; font:inherit; text-align:center; text-decoration:none; cursor:pointer; text-shadow:none; }
+#meow-panel button:hover,#meow-viewer button:hover { background:#f9d4e4; }
+#meow-panel button:disabled { opacity:.55; cursor:wait; }
+#meow-panel .meow-primary { width:100%; background:#efbdd2; margin-top:16px; }
+#meow-panel .meow-file input { display:block; max-width:100%; font-size:.8em; margin-top:5px; }
+#meow-panel small { display:block; color:#8d6a7b; font-size:.76em; line-height:1.6; }
+#meow-panel .meow-presets { border-bottom:1px dashed #e8c5d3; padding-bottom:10px; }
+#meow-panel .meow-checks { display:flex; flex-wrap:wrap; gap:0 15px; padding-bottom:12px; }
+#meow-panel .meow-source,#meow-panel .meow-scene { margin:12px 0; padding:10px; border:1px dashed #ddb3c5; border-radius:14px; background:#fff; }
+#meow-panel .meow-gallery { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding-top:12px; }
+#meow-panel .meow-gallery article { min-width:0; }
+#meow-panel .meow-gallery p { font-size:.85em; margin:4px 0; overflow-wrap:anywhere; }
+#meow-panel .meow-thumb { width:100%; padding:0; margin:0; background:#fceaf1; border:0; overflow:hidden; border-radius:14px; }
+#meow-panel .meow-thumb img { display:block; width:100%; aspect-ratio:3/4; object-fit:cover; }
+#meow-latest .meow-thumb { max-width:260px; margin:auto; }
+#meow-panel #meow-status { overflow-wrap:anywhere; font-size:.85em; line-height:1.6; }
+#meow-panel #meow-close { width:100%; background:#fff; margin-bottom:0; }
+#meow-panel :focus-visible,#meow-viewer :focus-visible { outline:3px solid #a85979; outline-offset:2px; }
+#meow-panel [hidden],#meow-floating[hidden] { display:none !important; }
+#meow-viewer { width:min(960px,calc(100vw - 12px)); max-width:none; max-height:calc(100dvh - 12px); padding:12px; border:0; border-radius:18px; background:#fff8fb; color:#674350; overflow:auto; }
+#meow-viewer .meow-full-image { display:block; max-width:100%; max-height:70dvh; margin:auto; object-fit:contain; cursor:zoom-in; touch-action:pan-y pinch-zoom; }
+#meow-viewer .meow-full-image.zoomed { max-height:none; max-width:none; width:150%; cursor:zoom-out; }
+#meow-viewer pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; padding:10px; border-radius:12px; background:#ffedf5; }
+#meow-floating { position:fixed; right:12px; bottom:110px; z-index:30000; display:block; padding:0; margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; touch-action:none; user-select:none; cursor:pointer; }
+#meow-floating img { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
+#meow-top-button { display:inline-flex; align-items:center; justify-content:center; min-width:30px; padding:4px; border:0; background:transparent; color:inherit; cursor:pointer; font-size:20px; }
+#meow-wand-button { pointer-events:auto; width:100%; height:auto; min-height:34px; display:block; padding:4px; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+#meow-open-settings { margin:10px 0; padding:10px; border:1px solid #ddb3c5; border-radius:12px; background:#fff2f7; color:#674350; cursor:pointer; }
+@media (max-width:420px) { #meow-panel { padding:0 12px 12px; } #meow-panel .meow-row button { font-size:.84em; padding:9px; } }
