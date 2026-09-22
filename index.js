@@ -55,6 +55,27 @@ export async function init(){
  const fields=[['secondary-url','url'],['secondary-model','model'],['tag-preset','preset'],['context-count','context_count'],['image-count','image_count'],['rules','rules'],['output','output']];
  const destination=()=>{let url;try{url=apiBase(secondary.url);}catch{url='尚未配置副 API 地址';}el('destination').textContent=`发送目标：${url} · 模型：${secondary.model||'未填写'}`;};
  fields.forEach(([id,k])=>{el(id).value=secondary[k];on(id,()=>{secondary[k]=el(id).value;save();destination();},'input');});destination();
+ let modelsLoading=false;
+ on('secondary-model-list',()=>{const value=el('secondary-model-list').value;if(value){el('secondary-model').value=value;secondary.model=value;save();destination();}},'change');
+ on('fetch-models',async()=>{
+  if(modelsLoading)return;
+  const url=apiBase(secondary.url),key=secondary.secret_id;
+  if(!key)throw new Error('请先保存副 API 密钥，再拉取模型。');
+  modelsLoading=true;el('fetch-models').disabled=true;el('models-state').textContent='正在拉取模型…';
+  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),30000);
+  try{
+   const response=await fetch('/api/backends/chat-completions/status',{method:'POST',headers:ctx().getRequestHeaders(),signal:abort.signal,body:JSON.stringify({chat_completion_source:'custom',custom_url:url,secret_id:key})});
+   if(!response.ok)throw new Error(`拉取模型失败（HTTP ${response.status}），可手动填写模型。`);
+   const data=await response.json();
+   if(data.error||!Array.isArray(data.data))throw new Error('服务商未返回模型列表，请检查地址和密钥，或手动填写模型。');
+   if(url!==apiBase(secondary.url)||key!==secondary.secret_id)throw new Error('地址或密钥已变化，请重新拉取模型。');
+   const ids=[...new Set(data.data.map(x=>x?.id).filter(x=>typeof x==='string'&&x.trim()))].sort();
+   el('secondary-model-list').replaceChildren(new Option('请选择模型',''),...ids.map(id=>new Option(id,id)));
+   if(ids.includes(secondary.model))el('secondary-model-list').value=secondary.model;
+   el('models-state').textContent=ids.length?`已拉取 ${ids.length} 个模型，请选择；也可手动填写。`:'模型列表为空，可手动填写。';
+  }catch(error){el('models-state').textContent=error.name==='AbortError'?'拉取超时，请重试或手动填写模型。':error.message;}
+  finally{clearTimeout(timer);modelsLoading=false;el('fetch-models').disabled=false;}
+ });
  on('save-secondary',async()=>{if(busy)throw new Error('请等待当前任务完成。');apiBase(secondary.url);const value=el('secondary-key').value.trim();if(!value)throw new Error('请填写副 API 密钥。');el('save-secondary').disabled=true;try{const id=await writeSecret(SECRET_KEYS.CUSTOM,value,'Meow secondary');if(!id)throw new Error('副 API 密钥保存失败。');secondary.secret_id=id;save();keyStatus();status('副 API 密钥已保存。');}finally{el('secondary-key').value='';el('save-secondary').disabled=false;}});
  on('tag-import',async()=>{const f=el('tag-import').files[0];if(!f)return;if(f.size>200000)throw new Error('预设文件太大。');secondary.preset=parseTagPreset(await f.text(),f.name);if(!secondary.preset.trim())throw new Error('预设没有可用文本。');el('tag-preset').value=secondary.preset;save();el('tag-import').value='';status('tags 预设已导入，可继续编辑。');},'change');
  on('tag-export',()=>download('meow-tags-preset.json',JSON.stringify({system_prompt:secondary.preset},null,2)));

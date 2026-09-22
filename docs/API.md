@@ -44,3 +44,6 @@ Meow 调用同源 `POST /api/novelai/generate-image`，沿用官方前端的扁�
 
 ## v0.3.2
 Official `image.RequestParameters.cfg_rescale` is exposed as Prompt Guidance Rescale. The drawing field (0–1, default 0) overrides advanced JSON and is saved in presets; official request imports populate it. The checked ST bridge does not forward this field: nonzero values require direct transport and are rejected before bridge requests.
+
+## v0.3.5 model discovery
+Checked official ST source `src/endpoints/backends/chat-completions.js`: POST `/api/backends/chat-completions/status` with custom_url, chat_completion_source=custom and secret_id reads the local Custom secret and requests GET `{base}/models`. Uses data[].id, handles HTTP-200 error payloads, timeout and stale configuration; no chat content is sent.

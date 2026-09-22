@@ -42,6 +42,10 @@ const launcherImage=$('floating').querySelector('img');assert.ok(launcherImage.s
 click('launcher-reset');assert.ok(!$('floating').hidden);
 
 field('prompt','white cat');field('fixed_positive','pastel');field('preset-name','test config');click('preset-save');await settle();assert.equal(extensionSettings.meow_presets.length,1);
+globalThis.fetch=async(url,options)=>{assert.equal(url,'/api/backends/chat-completions/status');const body=JSON.parse(options.body);assert.equal(body.secret_id,'mock-id');assert.equal(body.custom_url,'https://aux.test/v1');assert.ok(!body.messages);return new Response(JSON.stringify({data:[{id:'model-b'},{id:'model-a'},{id:'model-a'}]}));};
+click('fetch-models');await settle();assert.equal($('secondary-model-list').options.length,3);
+$('secondary-model-list').value='model-a';$('secondary-model-list').dispatchEvent(new Event('change'));assert.equal(extensionSettings.meow_secondary.model,'model-a');assert.equal($('secondary-model').value,'model-a');
+globalThis.fetch=async()=>new Response(JSON.stringify({error:true}));click('fetch-models');await settle();assert.equal($('fetch-models').disabled,false);assert.match($('models-state').textContent,/未返回模型列表/);assert.equal(extensionSettings.meow_secondary.model,'model-a');
 let calls=[];
 globalThis.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});if(url.includes('chat-completions'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'a white cat',source_ids:['m0p0']}]})}}]}));return new Response('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');};
 click('capture');await settle();assert.equal($('context-list').querySelectorAll('input[type=checkbox]').length,2);assert.ok(!$('send-preview').value.includes('private'));
