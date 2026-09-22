@@ -88,5 +88,8 @@ click('tags');await settle();assert.equal($('scenes').querySelectorAll('input[ty
 const x=$('scenes').querySelector('input');x.value='0.3';x.dispatchEvent(new Event('input'));
 click('bad-generate');await settle();assert.ok(directBody);assert.equal(directBody.parameters.v4_prompt.caption.char_captions[0].centers[0].x,0.3);assert.equal(directBody.parameters.v4_negative_prompt.caption.char_captions[1].char_caption,'white hair');assert.match(directBody.parameters.v4_prompt.caption.base_caption,/pastel/);
 const sceneEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.payload.direct);assert.equal(sceneEntry.payload.direct.parameters.v4_prompt.caption.char_captions.length,2);
+field('transport','bridge');field('cfg_rescale','0.18');field('sampler','k_dpmpp_2m_sde');
+$('variety_boost').checked=true;$('variety_boost').dispatchEvent(new Event('input'));$('decrisper').checked=true;$('decrisper').dispatchEvent(new Event('input'));
+click('generate');await settle();assert.equal(directBody.parameters.sampler,'k_dpmpp_2m_sde');assert.equal(directBody.parameters.cfg_rescale,0.18);assert.equal(directBody.parameters.skip_cfg_above_sigma,58);assert.equal(directBody.parameters.dynamic_thresholding,true);assert.equal($('generate').disabled,false);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();
