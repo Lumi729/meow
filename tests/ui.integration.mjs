@@ -43,9 +43,15 @@ click('launcher-reset');assert.ok(!$('floating').hidden);
 
 for(const page of ['bad','draw']){
  document.querySelector(`[data-page="${page}"]`).click();
- for(const size of [40,110]){field('floating-size',String(size));assert.equal($('floating').style.width,`${size}px`);assert.equal($('floating').querySelector('img').style.width,`${size}px`);assert.equal($('floating').querySelector('img').width,size);assert.equal($('floating').querySelector('img').style.getPropertyPriority('width'),'important');}
+ for(const size of [40,110]){field(page==='bad'?'bad-size':'floating-size',String(size));assert.equal($('floating').style.width,`${size}px`);assert.equal($('floating').querySelector('img').style.width,`${size}px`);assert.equal($('floating').querySelector('img').width,size);assert.equal($('floating').querySelector('img').style.getPropertyPriority('width'),'important');}
  assert.ok($('floating').querySelector('img').src.includes(page==='bad'?'love-transparent.png':'pet-phone.png'));
 }
+field('floating-size','50');field('bad-size','90');
+for(const [page,size] of [['bad',90],['draw',50]]){document.querySelector(`[data-page="${page}"]`).click();assert.equal($('floating').querySelector('img').width,size);}
+$('top-image').value='https://example.com/icon.png';$('top-image').dispatchEvent(new Event('change'));
+assert.equal($('top-button').querySelector('img').src,'https://example.com/icon.png');
+$('top-button').querySelector('img').dispatchEvent(new Event('error'));assert.ok(!$('top-button').querySelector('span').hidden);
+$('top-image').value='';$('top-image').dispatchEvent(new Event('change'));assert.ok(!$('top-button').querySelector('span').hidden);
 assert.equal([...$('sampler').options].find(o=>o.value==='k_euler_ancestral').textContent,'Euler Ancestral');
 field('prompt','white cat');field('fixed_positive','pastel');field('preset-name','test config');click('preset-save');await settle();assert.equal(extensionSettings.meow_presets.length,1);
 globalThis.fetch=async(url,options)=>{assert.equal(url,'/api/backends/chat-completions/status');const body=JSON.parse(options.body);assert.equal(body.secret_id,'mock-id');assert.equal(body.custom_url,'https://aux.test/v1');assert.ok(!body.messages);return new Response(JSON.stringify({data:[{id:'model-b'},{id:'model-a'},{id:'model-a'}]}));};

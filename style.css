@@ -58,3 +58,6 @@
 #meow-panel .meow-tabs { grid-template-columns:repeat(4,minmax(0,1fr)) 36px; align-items:center; gap:4px; }
 #meow-panel #meow-close-top { grid-column:5; grid-row:1; width:36px; min-height:40px; padding:0; border:0; background:transparent; font-size:20px; }
 #meow-panel .meow-tabs button[data-page] { min-height:40px; padding:7px 2px; font-size:.8em; white-space:nowrap; }
+
+#meow-top-button img { width:24px !important; height:24px !important; object-fit:contain; pointer-events:none; }
+#meow-top-button [hidden] { display:none !important; }

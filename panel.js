@@ -14,6 +14,13 @@ export function mountPanel(markup, preferences, save){
  host?.append(make('meow-open-settings','ฅ 打开猫猫星绘'));
  const top=document.querySelector('#top-settings-holder');
  const topButton=make('meow-top-button','✦');topButton.title='猫猫星绘';top?.append(topButton);
+ const topImage=document.createElement('img');topImage.alt='';topImage.referrerPolicy='no-referrer';topImage.width=topImage.height=24;topImage.hidden=true;
+ const topFallback=document.createElement('span');topFallback.textContent='✦';topButton.replaceChildren(topImage,topFallback);
+ topImage.addEventListener('error',()=>{topImage.hidden=true;topFallback.hidden=false;});
+ topImage.addEventListener('load',()=>{topImage.hidden=false;topFallback.hidden=true;});
+ let topUrl='';
+ const refreshTop=()=>{let next='';try{const u=new URL(preferences.top_image);if(u.protocol==='https:'&&!u.username&&!u.password)next=u.href;}catch{}
+ if(next===topUrl)return;topUrl=next;topImage.hidden=true;topFallback.hidden=false;if(next)topImage.src=next;else topImage.removeAttribute('src');};
  const floating=make('meow-floating','');floating.title='猫猫星绘 · 点击打开，拖动移动';
  const img=document.createElement('img');img.alt='猫猫星绘';img.draggable=false;img.referrerPolicy='no-referrer';floating.append(img);document.body.append(floating);
  const fallback=document.createElement('span');fallback.textContent='ฅ';fallback.hidden=true;floating.append(fallback);
@@ -23,7 +30,7 @@ export function mountPanel(markup, preferences, save){
  const safeImage=value=>{try{const u=new URL(value);return u.protocol==='https:'?u.href:defaults();}catch{return defaults();}};
  const clamp=(v,max)=>Math.min(Math.max(6,v),Math.max(6,max));
  const place=(x,y)=>{floating.style.left=`${clamp(x,innerWidth-floating.offsetWidth-6)}px`;floating.style.top=`${clamp(y,innerHeight-floating.offsetHeight-6)}px`;floating.style.right=floating.style.bottom='auto';};
- const refresh=()=>{topButton.hidden=preferences.top_enabled===false;floating.hidden=preferences.enabled===false;const size=Math.min(120,Math.max(36,Number(preferences.size)||64));for(const node of [floating,img,fallback]){for(const property of ['width','height','min-width','min-height','max-width','max-height'])node.style.setProperty(property,`${size}px`,'important');node.style.setProperty('box-sizing','border-box','important');node.style.setProperty('flex','none','important');}img.width=img.height=size;img.src=safeImage(mode==='bad'?preferences.bad_image:preferences.normal_image);if(Number.isFinite(preferences.x)&&Number.isFinite(preferences.y))place(preferences.x,preferences.y);else{place(innerWidth-size-12,innerHeight-size-110);}};
+ const refresh=()=>{refreshTop();topButton.hidden=preferences.top_enabled===false;floating.hidden=preferences.enabled===false;const size=Math.min(120,Math.max(36,Number(mode==='bad'?preferences.bad_size:preferences.normal_size)||Number(preferences.size)||64));for(const node of [floating,img,fallback]){for(const property of ['width','height','min-width','min-height','max-width','max-height'])node.style.setProperty(property,`${size}px`,'important');node.style.setProperty('box-sizing','border-box','important');node.style.setProperty('flex','none','important');}img.width=img.height=size;img.src=safeImage(mode==='bad'?preferences.bad_image:preferences.normal_image);if(Number.isFinite(preferences.x)&&Number.isFinite(preferences.y))place(preferences.x,preferences.y);else{place(innerWidth-size-12,innerHeight-size-110);}};
  let drag,suppress=false;
  floating.addEventListener('click',e=>{if(suppress){e.stopImmediatePropagation();e.preventDefault();suppress=false;}},true);
  floating.addEventListener('pointerdown',e=>{if(e.button!==0)return;suppress=false;const r=floating.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top,moved:false};floating.setPointerCapture(e.pointerId);});
