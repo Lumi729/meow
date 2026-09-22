@@ -95,9 +95,36 @@ export async function init(){
  const run=async fn=>{if(busy)throw new Error('猫猫正在忙，请等待当前任务完成。');stopping=false;controller=new AbortController();setBusy(true);try{await fn(controller.signal);}finally{setBusy(false);controller=null;}};
  on('update-self',()=>run(async()=>{if(modelsLoading)throw new Error('请等待模型列表拉取完成。');status('正在更新 Meow，成功后自动刷新酒馆…');await updateSelf(folder,ctx().getRequestHeaders(),saveSettings,()=>window.location.reload());}));
  on('stop',()=>{stopping=true;controller?.abort();status('已停止后续任务；已经发出的请求仍可能计费。');});
- const png=async(payload,signal)=>{if(payload.direct&&!directToken){document.querySelector('[data-page="config"]').click();el('token').focus();throw new Error('这些参数已自动使用完整参数请求。请在这里填写并保存 NovelAI Token，然后回去点生成；不需要手动切换通道。');}if(!payload.direct&&!secret_state[SECRET_KEYS.NOVEL])throw new Error('请先在设置里配置 NovelAI Token。');const timeout=setTimeout(()=>controller?.abort(),180000);try{const src=payload.direct?await requestDirect(payload.direct,directToken,signal):await requestImage(payload,ctx().getRequestHeaders(),signal);const check=new Image();check.src=src;await check.decode();return src;}finally{clearTimeout(timeout);}};
+ let lastTiming=null;
+ const seconds=ms=>(ms/1000).toFixed(1);
+ const timing=message=>{el('generation-timing').textContent=message;};
+ const png=async(payload,signal)=>{
+ if(payload.direct&&!directToken){document.querySelector('[data-page="config"]').click();el('token').focus();throw new Error('这些参数已自动使用完整参数请求。请填写并保存 NovelAI Token，然后回去点生成。');}
+ if(!payload.direct&&!secret_state[SECRET_KEYS.NOVEL])throw new Error('请先在设置里配置 NovelAI Token。');
+ const started=performance.now(),route=payload.direct?'浏览器直连':'酒馆服务器转发';let stage='等待图片返回';
+ const show=()=>timing(`${route} · ${stage} · 已用 ${seconds(performance.now()-started)} 秒`);show();
+ const interval=setInterval(show,500),timeout=setTimeout(()=>controller?.abort(),180000);
+ try{
+ const src=payload.direct?await requestDirect(payload.direct,directToken,signal):await requestImage(payload,ctx().getRequestHeaders(),signal);
+ const received=performance.now();stage='图片已返回，正在解码';show();
+ const check=new Image();check.src=src;await check.decode();
+ lastTiming={requestMs:received-started,decodeMs:performance.now()-received,route};
+ timing(`${route} · 请求及下载 ${seconds(lastTiming.requestMs)} 秒 · 解码 ${seconds(lastTiming.decodeMs)} 秒`);return src;
+ }catch(error){timing(`${route} · 未完成 · 已用 ${seconds(performance.now()-started)} 秒`);throw error;}
+ finally{clearTimeout(timeout);clearInterval(interval);}
+ };
+
  const prepare=cfg=>{const payload=buildRequest(cfg);if(advanced.transport==='direct'||payload.cfg_rescale!==0||payload.variety_boost||advanced.model.trim()||Object.keys(JSON.parse(advanced.parameters||'{}')).length)payload.direct=directRequest(payload,advanced.parameters,advanced.model);return payload;};
- const addImage=async entry=>{images.unshift(entry);try{await store.put(entry);}catch{entry.unsaved=true;status('图片已生成，但浏览器存储失败，请立即下载保存。');}renderGallery();el('latest').replaceChildren(textNode('p','画好啦，点击放大查看 ♡'),thumbnail(entry));};
+ const addImage=async entry=>{
+ images.unshift(entry);
+ // Show the returned image immediately; persistence must not delay its preview.
+ el('latest').replaceChildren(textNode('p','画好啦，点击放大查看 ♡'),thumbnail(entry));
+ const started=performance.now(),measured=lastTiming?{...lastTiming}:null;
+ try{await store.put(entry);}catch{entry.unsaved=true;status('图片已生成，但浏览器存储失败，请立即下载保存。');}
+ const saved=performance.now();renderGallery();
+ if(measured)timing(`${measured.route} · 请求及下载 ${seconds(measured.requestMs)} 秒 · 解码 ${seconds(measured.decodeMs)} 秒 · 保存 ${seconds(saved-started)} 秒${entry.unsaved?'（失败，请下载）':''}`);
+ };
+
  const makeEntry=(src,payload,source=[],title='星绘',key=chatKey())=>({id:crypto.randomUUID(),created:Date.now(),src,payload:structuredClone(payload),source:structuredClone(source),title,chatKey:key,bad:source.length>0});
  on('generate',()=>run(async signal=>{const payload=prepare(config()),key=chatKey();status('猫猫正在画画…');const src=await png(payload,signal);const entry=makeEntry(src,payload,[],'星绘',key);await addImage(entry);if(!entry.unsaved)status('图片已保存到图库。');}));
  const filtered=()=>images.filter(x=>el('gallery-filter').value==='chat'?x.chatKey===chatKey():el('gallery-filter').value==='bad'?x.bad:true);

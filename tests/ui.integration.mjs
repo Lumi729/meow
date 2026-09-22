@@ -91,5 +91,10 @@ const sceneEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list(
 field('transport','bridge');field('cfg_rescale','0.18');field('sampler','k_dpmpp_2m_sde');
 $('variety_boost').checked=true;$('variety_boost').dispatchEvent(new Event('input'));$('decrisper').checked=true;$('decrisper').dispatchEvent(new Event('input'));
 click('generate');await settle();assert.equal(directBody.parameters.sampler,'k_dpmpp_2m_sde');assert.equal(directBody.parameters.cfg_rescale,0.18);assert.equal(directBody.parameters.skip_cfg_above_sigma,58);assert.equal(directBody.parameters.dynamic_thresholding,true);assert.equal($('generate').disabled,false);
+let pendingTx;
+IDBDatabase.prototype.transaction=function(){pendingTx={objectStore:()=>({put:()=>({})}),abort:()=>{}};return pendingTx;};
+$('latest').replaceChildren();click('generate');await settle();assert.ok($('latest').querySelector('img'));assert.equal($('generate').disabled,true);
+pendingTx.oncomplete();await settle();assert.equal($('generate').disabled,false);IDBDatabase.prototype.transaction=originalTransaction;
+assert.match($('generation-timing').textContent,/请求及下载.*解码.*保存/);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();
