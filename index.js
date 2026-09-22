@@ -1,3 +1,4 @@
+import { mountCamera } from './camera.js';
 import { mountInline } from './inline.js';
 import { saveSettings } from '../../../../script.js';
 import { updateSelf } from './updater.js';
@@ -162,6 +163,7 @@ export async function init(){
  on('bad-generate',()=>run(async signal=>{checkChat();if(!scenes.length)throw new Error('请先捕捉原文并生成 tags。');const batch=structuredClone(scenes),base=config(),key=capture.key,output=secondary.output;const payloads=batch.map(s=>{const cfg={...base,prompt:s.prompt,extra_negative:combine(base.extra_negative,s.negative_prompt)};if(!s.characters)return prepare(cfg);
 
  const characters=validateCharacters(s.characters),payload=buildRequest(cfg);const extra=JSON.parse(advanced.parameters||'{}');if(!extra||typeof extra!=='object'||Array.isArray(extra))throw new Error('高级 parameters 必须是对象。');payload.direct=directRequest(payload,JSON.stringify({...extra,...characterParameters(characters,advanced.model||payload.model)}),advanced.model);return payload;});for(let i=0;i<batch.length;i++){if(stopping)break;checkChat();status(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);const src=await png(payloads[i],signal);const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);await addImage(entry);if(output==='chat'){if(key!==chatKey()){status('聊天已切换，图片已存入图文相册，未插入其他聊天。');break;}await insert(entry);}if(entry.unsaved)break;}status(stopping?'已停止后续图片。':'本轮完成，在图库筛选“坏猫猫图文”可查看原文和图片。');}));
+ mountCamera({root,context:ctx,chatKey,panel,page,secondary,run,isBusy:()=>busy,config,prepare,png,makeEntry,addImage,listImages:()=>images,stop:()=>{stopping=true;controller?.abort();}});
  ctx().eventSource.on(ctx().event_types.CHAT_CHANGED,()=>{capture=null;parts=[];scenes=[];el('context-list').replaceChildren();el('scenes').replaceChildren();el('send-preview').value='';renderGallery();});
  try{images=await store.list();renderGallery();}catch{status('当前浏览器无法打开图库存储，生成后请及时下载。');}
 }

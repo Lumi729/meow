@@ -71,3 +71,10 @@
 #meow-inline-viewer { width:min(960px,calc(100vw - 16px)); max-height:calc(100dvh - 16px); padding:12px; border:0; border-radius:18px; background:#fff8fb; color:#674350; overflow:auto; }
 #meow-inline-viewer::backdrop { background:#33223285; }
 #meow-inline-viewer .meow-inline-large { display:block; max-width:100%; max-height:75dvh; margin:auto; object-fit:contain; touch-action:pan-y pinch-zoom; }
+
+/* Wildfire camera workspace; other Meow pages retain their theme. */
+#meow-panel .meow-camera {background:#1b1717;color:#edebdd;padding:16px;border:1px solid #810100;border-radius:8px;}
+#meow-panel .meow-camera label {display:block;margin:14px 0;padding:10px;border:1px solid #553030;}
+#meow-panel .meow-camera button {background:#810100;color:#edebdd;border:1px solid #aa4545;margin:6px 4px;padding:10px;}
+#meow-panel .meow-camera textarea {background:#211c1c;color:#edebdd;width:100%;border:1px solid #704444;}
+#meow-panel .meow-camera p {white-space:pre-wrap;overflow-wrap:anywhere;}
