@@ -41,3 +41,6 @@ Meow 调用同源 `POST /api/novelai/generate-image`，沿用官方前端的扁�
 插图使用官方 public/scripts/utils.js 的 saveBase64AsFile → /api/images/upload，然后通过 getContext 的 chat/addOneMessage/saveChat 追加新消息，extra.image 为保存路径，extra.meow 标记避免再次捕捉本扩展输出。前后都核对 chat key，异步期间切换聊天则不插入。
 
 图库按当前用户配置中随机 scope 隔离，使用浏览器 IndexedDB，不与其他用户的图库合并。图片载入用于预览仅允许从已核验 PNG 返回构造 data URL；原文和副 API 内容通过 textContent/textarea 显示，插入聊天前 HTML 转义。分区使用有界字面字符串搜索，无用户正则执行。
+
+## v0.3.2
+Official `image.RequestParameters.cfg_rescale` is exposed as Prompt Guidance Rescale. The drawing field (0–1, default 0) overrides advanced JSON and is saved in presets; official request imports populate it. The checked ST bridge does not forward this field: nonzero values require direct transport and are rejected before bridge requests.

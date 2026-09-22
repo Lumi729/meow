@@ -38,7 +38,7 @@ for(const [control,entry,key] of [['top-enabled','top-button','top_enabled'],['f
  $(control).checked=false;$(control).dispatchEvent(new Event('input'));assert.ok($(entry).hidden);assert.equal(extensionSettings.meow_ui[key],false);
  $(control).checked=true;$(control).dispatchEvent(new Event('input'));assert.ok(!$(entry).hidden);
 }
-const launcherImage=$('floating').querySelector('img');assert.ok(launcherImage.src.endsWith('record-player.jpg'));launcherImage.dispatchEvent(new Event('error'));assert.ok(!$('floating').querySelector('span').hidden);launcherImage.dispatchEvent(new Event('load'));assert.ok($('floating').querySelector('span').hidden);
+const launcherImage=$('floating').querySelector('img');assert.ok(launcherImage.src.endsWith('pet-phone.jpg'));launcherImage.dispatchEvent(new Event('error'));assert.ok(!$('floating').querySelector('span').hidden);launcherImage.dispatchEvent(new Event('load'));assert.ok($('floating').querySelector('span').hidden);
 click('launcher-reset');assert.ok(!$('floating').hidden);
 
 field('prompt','white cat');field('fixed_positive','pastel');field('preset-name','test config');click('preset-save');await settle();assert.equal(extensionSettings.meow_presets.length,1);

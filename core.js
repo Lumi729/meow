@@ -5,7 +5,7 @@ export const MODELS = Object.freeze({
 });
 export const SAMPLERS = ['k_euler_ancestral','k_euler','k_dpmpp_2m','k_dpmpp_sde','k_dpmpp_2s_ancestral','k_dpm_fast','ddim'];
 export const SCHEDULERS = ['karras','native','exponential','polyexponential'];
-export const DEFAULTS = Object.freeze({ model:'nai-diffusion-4-5-full', prompt:'', fixed_positive:'', negative_prompt:'', extra_negative:'', width:832, height:1216, steps:28, scale:5, seed:-1, sampler:'k_euler_ancestral', scheduler:'karras', decrisper:false, variety_boost:false, sm:false, sm_dyn:false, upscale_ratio:1, anlas_guard:true });
+export const DEFAULTS = Object.freeze({ model:'nai-diffusion-4-5-full', prompt:'', fixed_positive:'', negative_prompt:'', extra_negative:'', width:832, height:1216, steps:28, scale:5, cfg_rescale:0, seed:-1, sampler:'k_euler_ancestral', scheduler:'karras', decrisper:false, variety_boost:false, sm:false, sm_dyn:false, upscale_ratio:1, anlas_guard:true });
 export const combine = (...parts) => parts.map(x=>String(x ?? '').trim()).filter(Boolean).join(', ');
 export function numberIn(value, min, max, label, integer=true) {
     if (String(value).trim()==='') throw new Error(`${label} 不能为空。`);
@@ -28,10 +28,11 @@ export function buildRequest(settings, randomSeed=()=>crypto.getRandomValues(new
     if((s.sm||s.sm_dyn)&&!supportsSm) throw new Error('SMEA 仅在 V2/V3 且非 DDIM 时启用，请关闭 SMEA。');
     if(s.sm_dyn&&!s.sm) throw new Error('SMEA DYN 需要同时开启 SMEA。');
     return {prompt,negative_prompt:combine(s.negative_prompt,s.extra_negative),model:s.model,width,height,steps,
-        scale:numberIn(s.scale,0,10,'引导',false), seed:seed===-1?randomSeed():seed,sampler:s.sampler,scheduler:s.scheduler,
+        cfg_rescale:numberIn(s.cfg_rescale,0,1,'Guidance Rescale',false), scale:numberIn(s.scale,0,10,'引导',false), seed:seed===-1?randomSeed():seed,sampler:s.sampler,scheduler:s.scheduler,
         upscale_ratio:numberIn(s.upscale_ratio,1,4,'放大倍数'),decrisper:!!s.decrisper,variety_boost:!!s.variety_boost,sm:!!s.sm,sm_dyn:!!s.sm_dyn};
 }
 export async function requestImage(payload,headers,signal,fetcher=fetch){
+    if(payload.cfg_rescale)throw new Error('Guidance Rescale 需要在设置中切换官网直连；酒馆通道不会转发此参数。');
     const r=await fetcher('/api/novelai/generate-image',{method:'POST',headers,signal,body:JSON.stringify(payload)});
     if(!r.ok) throw new Error(`生图失败（HTTP ${r.status}）。请检查 Token、Anlas、参数及酒馆日志；不会自动重试。`);
     const data=(await r.text()).trim();

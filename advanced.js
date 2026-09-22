@@ -11,7 +11,7 @@ export function directRequest(payload, extraText='{}', model=''){
   v4_negative_prompt:{caption:{base_caption:payload.negative_prompt,char_captions:[]}},...extra};
  if(payload.upscale_ratio!==1||payload.variety_boost)throw new Error('官网直连请关闭酒馆放大和 Variety Boost；需要时使用官网对应参数。');
  // The batch UI controls sample count; preserve fixed prompt composition in both caption formats.
- Object.assign(params,{width:payload.width,height:payload.height,steps:payload.steps,scale:payload.scale,seed:payload.seed,sampler:payload.sampler,noise_schedule:payload.scheduler,n_samples:1,negative_prompt:payload.negative_prompt});
+ Object.assign(params,{cfg_rescale:payload.cfg_rescale??0,width:payload.width,height:payload.height,steps:payload.steps,scale:payload.scale,seed:payload.seed,sampler:payload.sampler,noise_schedule:payload.scheduler,n_samples:1,negative_prompt:payload.negative_prompt});
  for(const key of ['v4_prompt','v4_negative_prompt']){
   if(params[key]!==undefined){if(!params[key]||typeof params[key]!=='object'||Array.isArray(params[key]))throw new Error(`${key} 必须是对象。`);
    params[key]={...params[key],caption:{...params[key].caption,base_caption:key==='v4_prompt'?payload.prompt:payload.negative_prompt}};}

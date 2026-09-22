@@ -45,9 +45,9 @@ test('API addresses reject embedded secrets and unsafe protocols',()=>{
 
 test('official direct protocol keeps one sample and fixed captions',async()=>{
  const {directRequest,requestDirect}=await import('../advanced.js');
- const p=buildRequest({prompt:'cat',fixed_positive:'style',seed:42});
+ const p=buildRequest({prompt:'cat',fixed_positive:'style',seed:42,cfg_rescale:0.18});
  const body=directRequest(p,JSON.stringify({cfg_rescale:0.5,n_samples:8,width:99999,v4_prompt:{caption:{char_captions:[{char_caption:'white cat',centers:[{x:0.5,y:0.5}]}]}}}));
- assert.equal(body.parameters.n_samples,1);assert.equal(body.parameters.width,832);assert.equal(body.parameters.v4_prompt.caption.base_caption,'style, cat');assert.equal(body.parameters.cfg_rescale,0.5);
+ assert.equal(body.parameters.n_samples,1);assert.equal(body.parameters.width,832);assert.equal(body.parameters.v4_prompt.caption.base_caption,'style, cat');assert.equal(body.parameters.cfg_rescale,0.18);
  await assert.rejects(requestDirect(body,'',undefined),/Token/);
  const src=await requestDirect(body,'test-only',undefined,async(url,options)=>{assert.equal(url,'https://image.novelai.net/ai/generate-image');assert.equal(options.headers.Accept,'application/json');return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));});
  assert.ok(src.startsWith('data:image/png;'));
