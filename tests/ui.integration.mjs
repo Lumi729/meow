@@ -21,6 +21,7 @@ window.document.body.innerHTML='<div id="top-settings-holder"></div><div id="ext
 let src=await fs.readFile(root+'index.js','utf8');
 const secretMock='export const SECRET_KEYS={NOVEL:"novel",CUSTOM:"custom"}; export const secret_state={novel:true};export async function writeSecret(){return "mock-id"}';
 const utilsMock='export async function saveBase64AsFile(){return "/user/images/test.png"}';
+src=src.replace("'../../../../script.js'",JSON.stringify('data:text/javascript,export async function saveSettings(){}'));
 src=src.replace("'../../../secrets.js'",JSON.stringify('data:text/javascript,'+encodeURIComponent(secretMock))).replace("'../../../utils.js'",JSON.stringify('data:text/javascript,'+encodeURIComponent(utilsMock)));
 src=src.replace(/from '(\.\/[^']+)'/g,(_,p)=>'from '+JSON.stringify(pathToFileURL(root+p.slice(2)).href));
 src=src.replace(/const folder=.*?;/, "const folder='third-party/meow';");

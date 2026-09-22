@@ -1,3 +1,5 @@
+import { saveSettings } from '../../../../script.js';
+import { updateSelf } from './updater.js';
 import { validateCharacters, characterParameters } from './characters.js';
 import { directRequest, requestDirect } from './advanced.js';
 import { DEFAULTS, MODELS, SAMPLERS, SAMPLER_LABELS, SCHEDULERS, buildRequest, requestImage, cleanPreset, numberIn, combine } from './core.js';
@@ -89,8 +91,9 @@ export async function init(){
  const launcherValues=()=>{launcherFields.forEach(([id,k,t])=>{if(t==='check')el(id).checked=ui[k]!==false;else el(id).value=ui[k]??'';});el('size-output').textContent=`${ui.normal_size||64}px`;el('bad-size-output').textContent=`${ui.bad_size||64}px`;};launcherValues();
  launcherFields.forEach(([id,k,t])=>on(id,()=>{if(t==='text'&&el(id).value.trim()&&!el(id).value.startsWith('https://'))throw new Error('图片链接需以 https:// 开头。');ui[k]=t==='check'?el(id).checked:t==='number'?Number(el(id).value):el(id).value.trim();save();panel.refresh();launcherValues();},t==='text'?'change':'input'));
  on('launcher-reset',()=>{panel.reset();launcherValues();status('已恢复小动物手机和爱字图片，悬浮按钮回到右侧。');});
- const setBusy=value=>{busy=value;for(const id of ['generate','tags','bad-generate','capture','save-token','save-secondary'])el(id).disabled=value;el('stop').hidden=!value;root.setAttribute('aria-busy',String(value));};
+ const setBusy=value=>{busy=value;for(const id of ['generate','tags','bad-generate','capture','save-token','save-secondary','update-self'])el(id).disabled=value;el('stop').hidden=!value;root.setAttribute('aria-busy',String(value));};
  const run=async fn=>{if(busy)throw new Error('猫猫正在忙，请等待当前任务完成。');stopping=false;controller=new AbortController();setBusy(true);try{await fn(controller.signal);}finally{setBusy(false);controller=null;}};
+ on('update-self',()=>run(async()=>{if(modelsLoading)throw new Error('请等待模型列表拉取完成。');status('正在更新 Meow，成功后自动刷新酒馆…');await updateSelf(folder,ctx().getRequestHeaders(),saveSettings,()=>window.location.reload());}));
  on('stop',()=>{stopping=true;controller?.abort();status('已停止后续任务；已经发出的请求仍可能计费。');});
  const png=async(payload,signal)=>{if(!secret_state[SECRET_KEYS.NOVEL])throw new Error('请先在设置里配置 NovelAI Token。');const timeout=setTimeout(()=>controller?.abort(),180000);try{const src=payload.direct?await requestDirect(payload.direct,directToken,signal):await requestImage(payload,ctx().getRequestHeaders(),signal);const check=new Image();check.src=src;await check.decode();return src;}finally{clearTimeout(timeout);}};
  const prepare=cfg=>{const payload=buildRequest(cfg);if(advanced.transport==='direct')payload.direct=directRequest(payload,advanced.parameters,advanced.model);return payload;};
