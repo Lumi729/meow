@@ -1,6 +1,6 @@
 import { validateCharacters, characterParameters } from './characters.js';
 import { directRequest, requestDirect } from './advanced.js';
-import { DEFAULTS, MODELS, SAMPLERS, SCHEDULERS, buildRequest, requestImage, cleanPreset, numberIn, combine } from './core.js';
+import { DEFAULTS, MODELS, SAMPLERS, SAMPLER_LABELS, SCHEDULERS, buildRequest, requestImage, cleanPreset, numberIn, combine } from './core.js';
 import { mountPanel } from './panel.js';
 import { galleryStore } from './storage.js';
 import { DEFAULT_RULES, TAG_PRESET, captureContext, parseTagPreset, parseScenes, apiBase, buildTagRequest } from './context.js';
@@ -35,7 +35,7 @@ export async function init(){
  const page=name=>{root.querySelectorAll('[data-view]').forEach(e=>e.hidden=e.dataset.view!==name);root.querySelectorAll('[data-page]').forEach(e=>e.setAttribute('aria-pressed',String(e.dataset.page===name)));panel.setMode(name);if(name==='gallery')renderGallery();};
  root.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>page(b.dataset.page)));
  for(const [value,label] of Object.entries(MODELS))el('model').add(new Option(label,value));
- SAMPLERS.forEach(v=>el('sampler').add(new Option(v,v)));SCHEDULERS.forEach(v=>el('scheduler').add(new Option(v,v)));
+ SAMPLERS.forEach(v=>el('sampler').add(new Option(SAMPLER_LABELS[v]||v,v)));SCHEDULERS.forEach(v=>el('scheduler').add(new Option(v,v)));
  const drawFields=()=>Object.entries(DEFAULTS).forEach(([k,v])=>{if(typeof v==='boolean')el(k).checked=!!settings[k];else el(k).value=String(settings[k]);});
  drawFields();
  for(const [key,defaultValue] of Object.entries(DEFAULTS))on(key,()=>{settings[key]=typeof defaultValue==='boolean'?el(key).checked:typeof defaultValue==='number'?Number(el(key).value):el(key).value;save();},'input');

@@ -4,6 +4,7 @@ export const MODELS = Object.freeze({
     'nai-diffusion-3': 'Anime V3', 'nai-diffusion-furry-3': 'Furry V3', 'nai-diffusion-2': 'Anime V2',
 });
 export const SAMPLERS = ['k_euler_ancestral','k_euler','k_dpmpp_2m','k_dpmpp_sde','k_dpmpp_2s_ancestral','k_dpm_fast','ddim'];
+export const SAMPLER_LABELS=Object.freeze({k_euler_ancestral:'Euler Ancestral',k_euler:'Euler',k_dpmpp_2m:'DPM++ 2M',k_dpmpp_sde:'DPM++ SDE',k_dpmpp_2s_ancestral:'DPM++ 2S Ancestral',k_dpm_fast:'DPM Fast',ddim:'DDIM'});
 export const SCHEDULERS = ['karras','native','exponential','polyexponential'];
 export const DEFAULTS = Object.freeze({ model:'nai-diffusion-4-5-full', prompt:'', fixed_positive:'', negative_prompt:'', extra_negative:'', width:832, height:1216, steps:28, scale:5, cfg_rescale:0, seed:-1, sampler:'k_euler_ancestral', scheduler:'karras', decrisper:false, variety_boost:false, sm:false, sm_dyn:false, upscale_ratio:1, anlas_guard:true });
 export const combine = (...parts) => parts.map(x=>String(x ?? '').trim()).filter(Boolean).join(', ');
