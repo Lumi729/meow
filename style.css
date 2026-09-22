@@ -46,3 +46,9 @@
 #meow-wand-button { pointer-events:auto; width:100%; height:auto; min-height:34px; display:block; padding:4px; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
 #meow-open-settings { margin:10px 0; padding:10px; border:1px solid #ddb3c5; border-radius:12px; background:#fff2f7; color:#674350; cursor:pointer; }
 @media (max-width:420px) { #meow-panel { padding:0 12px 12px; } #meow-panel .meow-row button { font-size:.84em; padding:9px; } }
+
+#meow-panel .meow-header { display:flow-root; }
+#meow-panel #meow-close-top { float:right; margin:0 0 8px 8px; padding:8px 10px; min-height:44px; }
+#meow-top-button[hidden],#meow-floating [hidden] { display:none !important; }
+#meow-floating { min-width:36px; min-height:36px; max-width:none; max-height:none; opacity:1; visibility:visible; }
+#meow-floating span { display:grid; place-items:center; width:100%; height:100%; border-radius:50%; background:#ffe6ef; color:#674350; font-size:28px; border:2px solid #ddb3c5; }
