@@ -17,7 +17,7 @@ export function mountPanel(markup, preferences, save){
  const floating=make('meow-floating','');floating.title='猫猫星绘 · 点击打开，拖动移动';
  const img=document.createElement('img');img.alt='猫猫星绘';img.draggable=false;img.referrerPolicy='no-referrer';floating.append(img);document.body.append(floating);
  const fallback=document.createElement('span');fallback.textContent='ฅ';fallback.hidden=true;floating.append(fallback);
- const defaults=()=>new URL(mode==='bad'?'assets/love-v2.jpg':'assets/pet-phone.jpg',base).href;
+ const defaults=()=>new URL(mode==='bad'?'assets/love-transparent.png':'assets/pet-phone.png',base).href;
  img.addEventListener('load',()=>{img.hidden=false;fallback.hidden=true;});
  img.addEventListener('error',()=>{if(img.src!==defaults())img.src=defaults();else{img.hidden=true;fallback.hidden=false;}});
  const safeImage=value=>{try{const u=new URL(value);return u.protocol==='https:'?u.href:defaults();}catch{return defaults();}};
