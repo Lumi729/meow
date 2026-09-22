@@ -9,10 +9,11 @@
   <label>✦ 这次想画什么<textarea id="meow-prompt" rows="4" placeholder="a fluffy white cat, pink bow, twinkling stars"></textarea></label>
   <label>固定负面<textarea id="meow-negative_prompt" rows="2" placeholder="不希望每张图出现的内容"></textarea></label>
   <label>本次补充负面<textarea id="meow-extra_negative" rows="2"></textarea></label>
-  <div class="meow-grid"><label>模型<select id="meow-model"></select></label><label>尺寸预设<select id="meow-size"><option value="">自定义</option><option value="832x1216">竖图 832 × 1216</option><option value="1216x832">横图 1216 × 832</option><option value="1024x1024">方图 1024 × 1024</option><option value="512x768">小竖图 512 × 768</option></select></label><label>宽度<input id="meow-width" type="number" min="64" max="2048" step="64"></label><label>高度<input id="meow-height" type="number" min="64" max="2048" step="64"></label><label>步数<input id="meow-steps" type="number" min="1" max="50"></label><label>提示词引导<input id="meow-scale" type="number" min="0" max="10" step="0.1"></label><label>Prompt Guidance Rescale<input id="meow-cfg_rescale" type="number" min="0" max="1" step="0.01" placeholder="0.18"><small>0 表示关闭；例如 0.18。非零值自动使用完整参数请求。</small></label><label>采样器<select id="meow-sampler"></select></label><label>噪声计划<select id="meow-scheduler"></select></label><label>种子（-1 随机）<input id="meow-seed" type="number" min="-1" max="4294967295"></label><label>放大倍数<select id="meow-upscale_ratio"><option value="1">不放大</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
+  <button id="meow-generate" type="button" class="meow-primary">✦ 猫猫，开始画画</button>
+  <details class="meow-drawing-params"><summary>绘图参数 · 模型 / 尺寸 / 采样器</summary>  <div class="meow-grid"><label>模型<select id="meow-model"></select></label><label>尺寸预设<select id="meow-size"><option value="">自定义</option><option value="832x1216">竖图 832 × 1216</option><option value="1216x832">横图 1216 × 832</option><option value="1024x1024">方图 1024 × 1024</option><option value="512x768">小竖图 512 × 768</option></select></label><label>宽度<input id="meow-width" type="number" min="64" max="2048" step="64"></label><label>高度<input id="meow-height" type="number" min="64" max="2048" step="64"></label><label>步数<input id="meow-steps" type="number" min="1" max="50"></label><label>提示词引导<input id="meow-scale" type="number" min="0" max="10" step="0.1"></label><label>Prompt Guidance Rescale<input id="meow-cfg_rescale" type="number" min="0" max="1" step="0.01" placeholder="0.18"><small>0 表示关闭；例如 0.18。非零值自动使用完整参数请求。</small></label><label>采样器<select id="meow-sampler"></select></label><label>噪声计划<select id="meow-scheduler"></select></label><label>种子（-1 随机）<input id="meow-seed" type="number" min="-1" max="4294967295"></label><label>放大倍数<select id="meow-upscale_ratio"><option value="1">不放大</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
   <div class="meow-checks"><label><input id="meow-decrisper" type="checkbox">Decrisper</label><label><input id="meow-variety_boost" type="checkbox">Variety Boost</label><label><input id="meow-sm" type="checkbox">SMEA（V2/V3）</label><label><input id="meow-sm_dyn" type="checkbox">SMEA DYN</label><label><input id="meow-anlas_guard" type="checkbox">节省模式：≤28 步、≤1MP、不放大</label></div>
   <small>会消耗 Anlas，节省模式不保证免费。固定正面 + 本次提示词一起发送；负面同理。模型不支持的设置会在发送前拦截。</small>
-  <button id="meow-generate" type="button" class="meow-primary">✦ 猫猫，开始画画</button>
+</details>
   <small id="meow-generation-timing" role="status" aria-live="polite"></small><div id="meow-latest"></div>
  </section>
  <section data-view="gallery" hidden>
@@ -31,12 +32,12 @@
   <button id="meow-tags" type="button">② 只发送勾选内容，生成 tags</button>
   <p id="meow-tags-status" role="status" aria-live="polite"></p><details><summary>副 API 原始返回</summary><textarea id="meow-raw-tags" rows="5" readonly></textarea></details>
   <div id="meow-scenes"></div>
-  <label>生成后放在哪里<select id="meow-output"><option value="journal">坏猫猫图文相册（附选中原文）</option><option value="chat">图文相册 + 当前聊天新消息</option></select></label>
+  <label>生成后放在哪里<select id="meow-output"><option value="journal">坏猫猫图文相册（附选中原文）</option><option value="chat">图文相册 + 插入对应原文后</option></select></label>
   <button id="meow-bad-generate" type="button" class="meow-primary">③ 用这些 tags 生成图片</button>
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
-  <small>tags 可以编辑后再生成。每张图保存它引用的原文，不会改写已有正文；切换聊天后需要重新捕捉。</small>
+  <small>tags 可以编辑后再生成。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><h3>扩展更新 · 0.3.12</h3><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><h3>扩展更新 · 0.4.0</h3><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <h3>✧ NovelAI</h3><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><button id="meow-save-token" type="button">保存本地 Token</button>
   <small>与酒馆共用 NovelAI 密钥，输入框保存后清空。不会进入配置导出或仓库。</small>
   <h3>♡ 副 API（OpenAI 兼容）</h3><label>基础地址<input id="meow-secondary-url" type="url" placeholder="https://服务商/v1"></label><label>模型<input id="meow-secondary-model" placeholder="手动填写或从下方选择"></label><div class="meow-row"><button id="meow-fetch-models" type="button">拉取模型</button><select id="meow-secondary-model-list" aria-label="副 API 模型列表"><option value="">拉取后选择模型</option></select></div><small id="meow-models-state" role="status">先填写基础地址并保存副 API 密钥，再拉取模型。</small><label>副 API 密钥<input id="meow-secondary-key" type="password" autocomplete="off"></label><button id="meow-save-secondary" type="button">保存副 API 密钥</button><p id="meow-secondary-state"></p><small>使用酒馆的 Custom 密钥管理，记录独立密钥 ID。该操作也会更新酒馆 Custom 当前密钥；原有密钥仍可在密钥管理中切换。发送目标会在原文确认区显示。</small>

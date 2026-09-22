@@ -1,3 +1,4 @@
+import { stripInline } from './inline.js';
 import { CHARACTER_INSTRUCTIONS, validateCharacters } from './characters.js';
 export const DEFAULT_RULES = Object.freeze([
     {name:'正文',start:'<正文>',end:'</正文>'},
@@ -31,10 +32,10 @@ export function splitMessage(text,rules=DEFAULT_RULES){
 }
 export function captureContext(chat,count,rules){
     const indexed=chat.map((m,i)=>({...m,index:i})).filter(m=>!m.is_system&&!m.extra?.meow);
-    return indexed.slice(-count).flatMap(m=>splitAutoMessage(m.mes,rules).map((p,j)=>({
-        id:`m${m.index}p${j}`,messageIndex:m.index,name:m.name|| (m.is_user?'用户':'角色'),part:p.name,text:p.text,
-        selected:!p.automatic&&p.name==='正文',
-    })));
+    return indexed.slice(-count).flatMap(m=>{const snapshot=stripInline(m.mes);let cursor=0;return splitAutoMessage(snapshot,rules).map((p,j)=>{
+     const start=snapshot.indexOf(p.text,cursor);cursor=start+p.text.length;
+     return {id:`m${m.index}p${j}`,messageIndex:m.index,name:m.name||(m.is_user?'用户':'角色'),part:p.name,text:p.text,anchorText:p.text,anchorStart:start,messageSnapshot:snapshot,selected:!p.automatic&&p.name==='正文'};
+    });});
 }
 export function parseTagPreset(text,filename=''){
     if(text.length>200000)throw new Error('预设太大（上限 200 KB）。');

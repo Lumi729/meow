@@ -55,3 +55,6 @@ Verified https://image.novelai.net/docs/doc.json definitions image.V4ConditionIn
 
 ## v0.3.11 compatibility
 DPM++ 2M SDE exists per NovelAI's official Summer Sampler Update and the user's official UI screenshot. Wire value k_dpmpp_2m_sde is corroborated by the original client author documentation at https://github.com/CyanAutumn/NovalAiAutoMatic (Sampler table); it is not an official schema enum and has not been tested against a paid live request here. Variety maps to official skip_cfg_above_sigma using the checked SillyTavern endpoint formula sqrt(width*height/1011712) times 58 for V4.5 or 19 for earlier models. Advanced/character/rescale/variety settings automatically use direct transport. Credentials remain user supplied in local ST and current page memory. Post-generation 2x/4x upscale still requires the basic ST bridge path; it is not silently ignored in direct requests.
+
+## v0.4.0 inline messages
+Verified official ST docs and local 1.19 source: context.updateMessageBlock(messageId,message), context.saveChat(), CHAT_CHANGED/MESSAGE_UPDATED/MESSAGE_SWIPED/USER_MESSAGE_RENDERED/CHARACTER_MESSAGE_RENDERED. Inserts local uploaded image Markdown after exact captured source, updates current swipe text, persists variant metadata in message.extra.meow_inline. No new chat messages. Source snapshots strip only extension image markers and reject stale text.
