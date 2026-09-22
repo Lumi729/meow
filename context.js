@@ -1,3 +1,4 @@
+import { CHARACTER_INSTRUCTIONS, validateCharacters } from './characters.js';
 export const DEFAULT_RULES = Object.freeze([
     {name:'正文',start:'<正文>',end:'</正文>'},
     {name:'小剧场',start:'<小剧场>',end:'</小剧场>'},
@@ -50,7 +51,7 @@ export function parseTagPreset(text,filename=''){
     }
     throw new Error('支持 TXT、prompt/system_prompt、messages 或酒馆 prompts JSON。');
 }
-export function parseScenes(text,sourceIds,count){
+export function parseScenes(text,sourceIds,count,withCharacters=false){
     let raw;try{raw=JSON.parse(String(text).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));}catch{throw new Error('副 API 未返回可解析 JSON，请查看原始返回后重试。');}
     const scenes=raw.scenes;
     if(!Array.isArray(scenes)||scenes.length!==count)throw new Error(`副 API 应返回 ${count} 个 scenes；没有自动发起生图。`);
@@ -58,7 +59,7 @@ export function parseScenes(text,sourceIds,count){
     return scenes.map((s,i)=>{
         if(typeof s.prompt!=='string'||!s.prompt.trim()||s.prompt.length>16000)throw new Error(`第 ${i+1} 幅提示词无效。`);
         if(!Array.isArray(s.source_ids)||!s.source_ids.length||s.source_ids.some(id=>!allowed.has(id)))throw new Error(`第 ${i+1} 幅原文引用无效。`);
-        return {title:String(s.title||`画面 ${i+1}`).slice(0,200),prompt:s.prompt,negative_prompt:String(s.negative_prompt||''),source_ids:[...new Set(s.source_ids)]};
+        return {...(withCharacters?{characters:validateCharacters(s.characters)}:{}),title:String(s.title||`画面 ${i+1}`).slice(0,200),prompt:s.prompt,negative_prompt:String(s.negative_prompt||''),source_ids:[...new Set(s.source_ids)]};
     });
 }
 export function apiBase(value){
@@ -72,7 +73,7 @@ export function buildTagRequest(config,parts,count){
     if(!config.model?.trim())throw new Error('请填写副 API 模型。');
     return {chat_completion_source:'custom',custom_url:apiBase(config.url),secret_id:config.secret_id,
         model:config.model.trim(),stream:false,temperature:0.7,max_tokens:4096,
-        messages:[{role:'system',content:`${config.preset||TAG_PRESET}\n\n输出严格 JSON：{"scenes":[{"title":"标题","prompt":"English tags","negative_prompt":"","source_ids":["原文 id"]}]}。必须恰好 ${count} 幅。source_ids 只能引用用户提供的 id。不要输出代码围栏或解释。`},
+        messages:[{role:'system',content:`${config.preset||TAG_PRESET}\n${config.character_mode?CHARACTER_INSTRUCTIONS:''}\n输出严格 JSON：{"scenes":[{"title":"标题","prompt":"English tags","negative_prompt":"","source_ids":["原文 id"]}]}。必须恰好 ${count} 幅。source_ids 只能引用用户提供的 id。不要输出代码围栏或解释。`},
         {role:'user',content:JSON.stringify({passages:parts.map(p=>({id:p.id,speaker:p.name,section:p.part,text:p.text}))})}]};
 }
 

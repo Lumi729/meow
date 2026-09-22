@@ -62,3 +62,18 @@ test('automatic tags partition nested content and require explicit selection',()
  assert.ok(captureContext([{mes:text}],1).every(p=>!p.selected));
  assert.equal(splitAutoMessage('<broken>text')[0].name,'未分类原文');
 });
+test('character scene validation and official mapping preserve identity and fixed tags',async()=>{
+ const {validateCharacters,characterParameters}=await import('../characters.js');
+ const {directRequest}=await import('../advanced.js');
+ const chars=[{name:'A',prompt:'white hair',negative_prompt:'black hair',x:0.2,y:0.5},{name:'B',prompt:'black hair',negative_prompt:'white hair',x:0.8,y:0.5}];
+ const raw=JSON.stringify({scenes:[{prompt:'2people',source_ids:['m0p0'],characters:chars}]});
+ const scenes=parseScenes(raw,['m0p0'],1,true);assert.equal(scenes[0].characters.length,2);
+ const body=directRequest(buildRequest({prompt:'2people',fixed_positive:'pastel',negative_prompt:'bad quality'}),JSON.stringify(characterParameters(chars,'nai-diffusion-4-5-full')));
+ assert.equal(body.parameters.v4_prompt.caption.base_caption,'pastel, 2people');assert.equal(body.parameters.v4_negative_prompt.caption.base_caption,'bad quality');
+ assert.equal(body.parameters.v4_prompt.caption.char_captions[1].centers[0].x,0.8);assert.equal(body.parameters.v4_negative_prompt.caption.char_captions[1].char_caption,'white hair');
+ assert.throws(()=>validateCharacters([{...chars[0],x:2}]),/位置/);assert.throws(()=>characterParameters(chars,'nai-diffusion-3'),/V4/);
+ assert.throws(()=>parseScenes(JSON.stringify({scenes:[{prompt:'cat',source_ids:['m0p0']}]}),['m0p0'],1,true),/characters/);
+ assert.ok(!('token' in validateCharacters([{...chars[0],token:'discard'}])[0]));
+ const req=buildTagRequest({url:'https://example.com/v1',model:'m',preset:'MY PRESET',character_mode:true},[{id:'m0p0',text:'story'}],1);
+ assert.ok(req.messages[0].content.includes('MY PRESET'));assert.ok(req.messages[0].content.includes('characters'));
+});

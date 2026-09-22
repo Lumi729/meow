@@ -21,7 +21,7 @@
   <small>图片和原文保存在当前浏览器中；清除网站数据会丢失。点击图片放大，左右滑动切换。</small><div id="meow-gallery" class="meow-gallery"></div>
  </section>
  <section data-view="bad" hidden>
-  <h3>♡ 坏猫猫 · 把故事画出来</h3>
+  <h3>♡ 坏猫猫 · 把故事画出来</h3><label><input id="meow-character-mode" type="checkbox">生成多角色 tags 和位置</label><small>将角色格式要求附加到你的预设，不覆盖原预设。需选择 V4 / V4.5、官网直连，并在本次页面保存 NovelAI Token；角色返回后可逐人修改。</small>
   <div class="meow-grid"><label>最近消息条数<input id="meow-context-count" type="number" value="5" min="1" max="50"></label><label>这次生成几张<input id="meow-image-count" type="number" value="1" min="1" max="8"></label></div>
   <label>补充分区规则（JSON，可选）<textarea id="meow-rules" rows="4" spellcheck="false"></textarea></label><small>自动识别 &lt;标签&gt;…&lt;/标签&gt;，支持中文、英文、属性和嵌套。自动识别的分区需手动勾选；特殊标记可用下面的 start/end 规则补充。</small>
   <button id="meow-capture" type="button">① 捕捉当前聊天</button>

@@ -47,3 +47,6 @@ Official `image.RequestParameters.cfg_rescale` is exposed as Prompt Guidance Res
 
 ## v0.3.5 model discovery
 Checked official ST source `src/endpoints/backends/chat-completions.js`: POST `/api/backends/chat-completions/status` with custom_url, chat_completion_source=custom and secret_id reads the local Custom secret and requests GET `{base}/models`. Uses data[].id, handles HTTP-200 error payloads, timeout and stale configuration; no chat content is sent.
+
+## v0.3.6 characters
+Verified https://image.novelai.net/docs/doc.json definitions image.V4ConditionInput, image.V4ExternalCaption, image.V4ExternalCharacterCaption: caption.base_caption, caption.char_captions[].char_caption/centers[], use_coords/use_order. Our auxiliary response schema characters is app-owned and validated; it cannot supply arbitrary endpoint/credentials/parameters. ST 1.19 checked bridge hardcodes empty char_captions, so this workflow explicitly requires direct mode.

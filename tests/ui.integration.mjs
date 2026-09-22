@@ -64,5 +64,16 @@ IDBDatabase.prototype.transaction=function(){throw new Error('simulated storage 
 click('generate');await settle();assert.equal(calls.length,5);assert.equal($('generate').disabled,false);assert.match($('status').textContent,/存储失败/);
 IDBDatabase.prototype.transaction=originalTransaction;
 click('generate');await settle();assert.equal(calls.length,6);assert.equal($('generate').disabled,false);
+// Full multi-character UI flow, with local mock credentials and no paid requests.
+field('transport','direct');field('token','test-only');click('save-token');await settle();
+$('character-mode').checked=true;$('character-mode').dispatchEvent(new Event('change'));
+click('capture');await settle();const section=$('context-list').querySelector('input');section.checked=true;section.dispatchEvent(new Event('change'));
+const characters=[{name:'A',prompt:'white hair',negative_prompt:'black hair',x:0.2,y:0.5},{name:'B',prompt:'black hair',negative_prompt:'white hair',x:0.8,y:0.5}];
+let directBody;
+globalThis.fetch=async(url,options)=>{if(url.includes('chat-completions')){assert.match(JSON.parse(options.body).messages[0].content,/characters/);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'2people',source_ids:['m0p0'],characters}]})}}]}));}directBody=JSON.parse(options.body);return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
+click('tags');await settle();assert.equal($('scenes').querySelectorAll('input[type=number]').length,4);
+const x=$('scenes').querySelector('input');x.value='0.3';x.dispatchEvent(new Event('input'));
+click('bad-generate');await settle();assert.ok(directBody);assert.equal(directBody.parameters.v4_prompt.caption.char_captions[0].centers[0].x,0.3);assert.equal(directBody.parameters.v4_negative_prompt.caption.char_captions[1].char_caption,'white hair');assert.match(directBody.parameters.v4_prompt.caption.base_caption,/pastel/);
+const sceneEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.payload.direct);assert.equal(sceneEntry.payload.direct.parameters.v4_prompt.caption.char_captions.length,2);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();
