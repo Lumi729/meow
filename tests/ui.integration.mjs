@@ -19,7 +19,7 @@ const context={extensionSettings,getCurrentChatId:()=>current,characterId:0,name
 globalThis.SillyTavern={getContext:()=>context};
 window.document.body.innerHTML='<div id="top-settings-holder"></div><div id="extensionsMenu"></div><div id="extensions_settings2"></div>';
 let src=await fs.readFile(root+'index.js','utf8');
-const secretMock='export const SECRET_KEYS={NOVEL:"novel",CUSTOM:"custom"}; export const secret_state={novel:true};export async function writeSecret(){return "mock-id"}';
+const secretMock='export const SECRET_KEYS={NOVEL:"novel",CUSTOM:"custom"}; export const secret_state={novel:true};export async function findSecret(){return null};export async function writeSecret(){return "mock-id"}';
 const utilsMock='export async function saveBase64AsFile(){return "/user/images/test.png"}';
 src=src.replace("'../../../../script.js'",JSON.stringify('data:text/javascript,export async function saveSettings(){}'));
 src=src.replace("'../../../secrets.js'",JSON.stringify('data:text/javascript,'+encodeURIComponent(secretMock))).replace("'../../../utils.js'",JSON.stringify('data:text/javascript,'+encodeURIComponent(utilsMock)));
@@ -60,10 +60,10 @@ click('fetch-models');await settle();assert.equal($('secondary-model-list').opti
 $('secondary-model-list').value='model-a';$('secondary-model-list').dispatchEvent(new Event('change'));assert.equal(extensionSettings.meow_secondary.model,'model-a');assert.equal($('secondary-model').value,'model-a');
 globalThis.fetch=async()=>new Response(JSON.stringify({error:true}));click('fetch-models');await settle();assert.equal($('fetch-models').disabled,false);assert.match($('models-state').textContent,/未返回模型列表/);assert.equal(extensionSettings.meow_secondary.model,'model-a');
 let calls=[];
-globalThis.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});if(url.includes('chat-completions'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'a white cat',source_ids:['m0p0']}]})}}]}));return new Response('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');};
+globalThis.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});if(url.includes('chat-completions'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'a white cat',source_ids:['m0p0'],anchor_source_id:'m0p0',anchor_quote:'white cat'}]})}}]}));return new Response('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');};
 click('capture');await settle();assert.equal($('context-list').querySelectorAll('input[type=checkbox]').length,2);assert.ok(!$('send-preview').value.includes('private'));
 const choice=$('context-list').querySelector('input');choice.checked=true;choice.dispatchEvent(new Event('change'));
-click('tags');await settle();assert.equal(calls.length,1);assert.ok(!JSON.stringify(calls[0]).includes('do not send private'));assert.equal($('scenes').querySelectorAll('textarea').length,2);
+click('tags');await settle();assert.equal(calls.length,1);assert.ok(!JSON.stringify(calls[0]).includes('do not send private'));assert.equal($('scenes').querySelectorAll('textarea').length,3);
 click('bad-generate');await settle();assert.equal(calls.length,2);assert.equal(calls[1].body.prompt,'pastel, a white cat');assert.equal($('gallery').querySelectorAll('article').length,1);
 $('gallery').querySelector('button').click();await settle();assert.ok($('viewer').open);assert.ok($('viewer').textContent.includes('white cat'));assert.ok(!$('viewer').textContent.includes('private'));
 click('close');assert.equal($('prompt').value,'white cat');
@@ -83,7 +83,7 @@ $('character-mode').checked=true;$('character-mode').dispatchEvent(new Event('ch
 click('capture');await settle();const section=$('context-list').querySelector('input');section.checked=true;section.dispatchEvent(new Event('change'));
 const characters=[{name:'A',prompt:'white hair',negative_prompt:'black hair',x:0.2,y:0.5},{name:'B',prompt:'black hair',negative_prompt:'white hair',x:0.8,y:0.5}];
 let directBody;
-globalThis.fetch=async(url,options)=>{if(url.includes('chat-completions')){assert.match(JSON.parse(options.body).messages[0].content,/characters/);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'2people',source_ids:['m0p0'],characters}]})}}]}));}directBody=JSON.parse(options.body);return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
+globalThis.fetch=async(url,options)=>{if(url.includes('chat-completions')){assert.match(JSON.parse(options.body).messages[0].content,/characters/);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'2people',source_ids:['m0p0'],anchor_source_id:'m0p0',anchor_quote:'white cat',characters}]})}}]}));}directBody=JSON.parse(options.body);return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
 click('tags');await settle();assert.equal($('scenes').querySelectorAll('input[type=number]').length,4);assert.match($('tags-status').textContent,/tags 已返回/);field('transport','direct');
 const x=$('scenes').querySelector('input');x.value='0.3';x.dispatchEvent(new Event('input'));
 click('bad-generate');await settle();assert.ok(directBody);assert.equal(directBody.parameters.v4_prompt.caption.char_captions[0].centers[0].x,0.3);assert.equal(directBody.parameters.v4_negative_prompt.caption.char_captions[1].char_caption,'white hair');assert.match(directBody.parameters.v4_prompt.caption.base_caption,/pastel/);
@@ -96,5 +96,12 @@ IDBDatabase.prototype.transaction=function(){pendingTx={objectStore:()=>({put:()
 $('latest').replaceChildren();click('generate');await settle();assert.ok($('latest').querySelector('img'));assert.equal($('generate').disabled,true);
 pendingTx.oncomplete();await settle();assert.equal($('generate').disabled,false);IDBDatabase.prototype.transaction=originalTransaction;
 assert.match($('generation-timing').textContent,/请求及下载.*解码.*保存/);
+// Both page previews retain viewer swipes after closing, and have their own carousel.
+assert.ok($('bad-latest').querySelector('img'));
+$('latest').querySelector('.meow-thumb').click();await settle();
+[...$('viewer').querySelectorAll('button')].find(x=>x.textContent==='下一张 ›').click();await settle();
+const chosenPreview=extensionSettings.meow_preview.draw;$('viewer').close();
+assert.equal(extensionSettings.meow_preview.draw,chosenPreview);assert.ok($('latest').textContent.includes('2 /'));
+$('latest').querySelector('.meow-row button').click();await settle();assert.ok($('latest').textContent.includes('1 /'));
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();

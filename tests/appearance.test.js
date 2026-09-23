@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {scanAppearance} from '../appearance.js';
+import {buildTagRequest,captureContext,parseScenes,sceneAnchor,splitAutoMessage} from '../context.js';
+import {tokenVault} from '../credentials.js';
+import {indexedDB} from 'fake-indexeddb';
+test('scan current character, user and associated books with stable identities and no unrelated books',async()=>{
+ const loaded=[];const result=await scanAppearance({characters:[{name:'A',avatar:'A.png',description:'A：银色头发',data:{extensions:{world:'main'}}}],characterId:0,name1:'U',powerUserSettings:{persona_description:'U：粉色短发',persona_description_lorebook:'user'},chatMetadata:{world_info:'chat'},loadWorldInfo:async name=>{loaded.push(name);return {entries:{a:{comment:'B',content:'姓名：B\n外貌：黑发，蓝眼\n衣服：白衬衫'},b:{disable:true,content:'disabled hair'},c:{content:'服务器维护公告'}}};}},{world_info:{charLore:[{name:'A',extraBooks:['extra']}],globalSelect:['global']}});
+ assert.deepEqual(new Set(loaded),new Set(['main','extra','chat','user','global']));assert.match(result.text,/A：银色头发/);assert.match(result.text,/U：粉色短发/);assert.match(result.text,/B/);assert.ok(!result.text.includes('服务器维护'));assert.ok(!result.text.includes('disabled'));
+ const req=buildTagRequest({model:'mock',url:'https://api.example/v1',appearance:result.text},[{id:'a',text:'A走进客厅'}],1);assert.match(req.messages[1].content,/银色头发/);
+});
+test('content stays whole with malformed inner HTML, code fences and literal angle brackets',()=>{
+ for(const text of ['<content>第一句<x>坏嵌套</other>第二句</content>','<content>第一句\n```html\n<div>代码</div>\n```\n第二句</content>','<content>开始 <notclosed> 结束</content>']){const parts=splitAutoMessage(text);assert.equal(parts.length,1);assert.equal(parts[0].text,text);assert.equal(parts[0].name,'正文');}
+});
+test('N scenes across passages use their own exact sentence, not every referenced paragraph',()=>{
+ const parts=captureContext([{mes:'<content>甲句。乙句。</content>'},{mes:'<content>丙句。丁句。</content>'}],2);
+ const scene={prompt:'scene',source_ids:parts.map(p=>p.id),anchor_source_id:parts[1].id,anchor_quote:'丙句。',anchor_occurrence:1};
+ const anchor=sceneAnchor(scene,parts);assert.equal(anchor.messageIndex,1);assert.equal(anchor.anchorStart,9);assert.equal(anchor.anchorText,'丙句。');
+ assert.throws(()=>sceneAnchor({...scene,anchor_quote:'编造'},parts),/不一致/);
+ const parsed=parseScenes(JSON.stringify({scenes:[scene]}),parts.map(p=>p.id),1);assert.equal(parsed[0].anchor_quote,'丙句。');
+});
+test('local direct token survives a new vault instance but stays isolated by profile',async()=>{
+ globalThis.indexedDB=indexedDB;await tokenVault('one').set('fake-local-token');assert.equal(await tokenVault('one').get(),'fake-local-token');assert.equal(await tokenVault('two').get(),'');await tokenVault('one').clear();assert.equal(await tokenVault('one').get(),'');
+});

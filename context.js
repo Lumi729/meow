@@ -2,6 +2,7 @@ import { stripInline } from './inline.js';
 import { CHARACTER_INSTRUCTIONS, validateCharacters } from './characters.js';
 export const DEFAULT_RULES = Object.freeze([
     {name:'正文',start:'<正文>',end:'</正文>'},
+    {name:'正文',start:'<content>',end:'</content>'},
     {name:'小剧场',start:'<小剧场>',end:'</小剧场>'},
     {name:'状态栏',start:'<状态栏>',end:'</状态栏>'},
 ]);
@@ -60,7 +61,7 @@ export function parseScenes(text,sourceIds,count,withCharacters=false){
     return scenes.map((s,i)=>{
         if(typeof s.prompt!=='string'||!s.prompt.trim()||s.prompt.length>16000)throw new Error(`第 ${i+1} 幅提示词无效。`);
         if(!Array.isArray(s.source_ids)||!s.source_ids.length||s.source_ids.some(id=>!allowed.has(id)))throw new Error(`第 ${i+1} 幅原文引用无效。`);
-        return {...(withCharacters?{characters:validateCharacters(s.characters)}:{}),title:String(s.title||`画面 ${i+1}`).slice(0,200),prompt:s.prompt,negative_prompt:String(s.negative_prompt||''),source_ids:[...new Set(s.source_ids)]};
+        return {...(withCharacters?{characters:validateCharacters(s.characters)}:{}),title:String(s.title||`画面 ${i+1}`).slice(0,200),prompt:s.prompt,negative_prompt:String(s.negative_prompt||''),source_ids:[...new Set(s.source_ids)],anchor_source_id:typeof s.anchor_source_id==='string'?s.anchor_source_id:'',anchor_quote:typeof s.anchor_quote==='string'?s.anchor_quote:'',anchor_occurrence:Number.isInteger(s.anchor_occurrence)?s.anchor_occurrence:1};
     });
 }
 export function apiBase(value){
@@ -74,21 +75,21 @@ export function buildTagRequest(config,parts,count){
     if(!config.model?.trim())throw new Error('请填写副 API 模型。');
     return {chat_completion_source:'custom',custom_url:apiBase(config.url),secret_id:config.secret_id,
         model:config.model.trim(),stream:false,temperature:0.7,max_tokens:4096,
-        messages:[{role:'system',content:`${config.preset||TAG_PRESET}\n${config.character_mode?CHARACTER_INSTRUCTIONS:''}\n输出严格 JSON：{"scenes":[{"title":"标题","prompt":"English tags","negative_prompt":"","source_ids":["原文 id"]}]}。必须恰好 ${count} 幅。source_ids 只能引用用户提供的 id。不要输出代码围栏或解释。`},
-        {role:'user',content:JSON.stringify({passages:parts.map(p=>({id:p.id,speaker:p.name,section:p.part,text:p.text}))})}]};
+        messages:[{role:'system',content:`${config.preset||TAG_PRESET}\n${config.character_mode?CHARACTER_INSTRUCTIONS:''}\n输出严格 JSON：{"scenes":[{"title":"标题","prompt":"English tags","negative_prompt":"","source_ids":["引用资料 id"],"anchor_source_id":"图片位置的原文 id","anchor_quote":"逐字复制该场景对应的完整原文句子","anchor_occurrence":1}]}。从所有选中的文本整体挑选恰好 ${count} 个不同场景，不是每段各生成 ${count} 幅。每幅只选择一个插图位置，位置应分布在各自场景的句子后。anchor_quote 必须是 anchor_source_id 的原文连续片段，不能改写、不能含标签，重复出现时 anchor_occurrence 从 1 开始计数。appearance_reference 是人物身份资料：严格区分每个名字对应的发型、发色、眼睛和服装，不把不同角色特征混合。资料未说明的特征不要自行更换。source_ids 只能引用用户提供的 id。不要输出代码围栏或解释。`},
+        {role:'user',content:JSON.stringify({appearance_reference:config.appearance||'',passages:parts.map(p=>({id:p.id,speaker:p.name,section:p.part,text:p.text}))})}]};
 }
 
 /** Discover balanced XML-style tags without rendering or executing chat HTML. */
 export function splitAutoMessage(value,rules=DEFAULT_RULES){
  const text=String(value??''),stack=[],ranges=[];
+ const masked=text.replace(/(```|~~~)[\s\S]*?\1/g,m=>' '.repeat(m.length)).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,m=>' '.repeat(m.length));
  const tokens=/<!--[\s\S]*?-->|<(\/?)([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s+(?:[^<>"']|"[^"]*"|'[^']*')*?)?\s*(\/?)>/gu;
- for(const match of text.matchAll(tokens)){
+ for(const match of masked.matchAll(tokens)){
   const [raw,closing,name,self]=match;
   if(!name||self||['br','hr','img','input','meta','link','source','wbr','area','base','embed','param','track','col'].includes(name.toLowerCase()))continue;
   if(!closing){stack.push({name,a:match.index,openEnd:match.index+raw.length});continue;}
-  const top=stack.at(-1);
-  if(!top||top.name!==name){stack.length=0;continue;}
-  stack.pop();ranges.push({...top,b:match.index+raw.length});
+  const i=stack.findLastIndex(x=>x.name===name);if(i<0)continue;
+  const top=stack[i];stack.length=i;ranges.push({...top,b:match.index+raw.length});
  }
  if(!ranges.length)return splitMessage(text,rules);
  // Keep the outermost balanced pair whole, including all nested tags.
@@ -97,8 +98,23 @@ export function splitAutoMessage(value,rules=DEFAULT_RULES){
  for(const range of ranges){
   if(range.a<cursor)continue;
   if(range.a>cursor)parts.push(...splitMessage(text.slice(cursor,range.a),rules));
-  parts.push({name:range.name,text:text.slice(range.a,range.b),automatic:true});cursor=range.b;
+  const main=['content','正文'].includes(range.name.toLowerCase());parts.push({name:main?'正文':range.name,text:text.slice(range.a,range.b),automatic:!main});cursor=range.b;
  }
  if(cursor<text.length)parts.push(...splitMessage(text.slice(cursor),rules));
  return parts;
+}
+
+/** One picture, one validated sentence anchor, even when several passages inform it. */
+export function sceneAnchor(scene,parts){
+ const id=scene.anchor_source_id||scene.source_ids?.[0],source=parts.find(p=>p.id===id);
+ if(!source||!scene.source_ids.includes(id))throw new Error('图片位置没有引用有效原文。');
+ const quote=scene.anchor_quote?.trim();if(!quote||/[<>]/.test(quote))throw new Error('请填写逐字对应原文的插图句子（不要带标签）。');
+ const occurrence=scene.anchor_occurrence||1;let at=-1;
+ for(let i=0;i<occurrence;i++){at=source.text.indexOf(quote,at+1);if(at<0)throw new Error('插图句子与原文不一致，请重新选择句子。');}
+ const offset=source.messageSnapshot?.indexOf(source.anchorText??source.text,source.anchorStart??0);
+ const base=source.anchorStart??offset;if(!Number.isInteger(base)||base<0)throw new Error('原文位置失效，请重新捕捉。');
+ // Edits to the preview can shorten text; locate the quote against the unchanged source anchor.
+ const original=source.anchorText??source.text;let originalAt=-1;for(let i=0;i<occurrence;i++)originalAt=original.indexOf(quote,originalAt+1);
+ if(originalAt<0)throw new Error('这段文字经过改写，无法定位到正文。');
+ return {...source,anchorText:quote,anchorStart:base+originalAt};
 }

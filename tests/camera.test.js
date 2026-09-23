@@ -12,7 +12,7 @@ test('iframe camera flow validates source, generates isolated tags and returns p
  const api=mountCamera({root:document.querySelector('#panel'),context:()=>ctx,chatKey:()=>key,panel:{open:()=>opened++,setMode:()=>{},dialog:{close:()=>{}}},page:()=>{},secondary:{url:'https://example.com/v1',model:'mock',secret_id:'local'},run:fn=>fn(new AbortController().signal),isBusy:()=>false,config:()=>({}),prepare:x=>x,png:async()=> 'data:image/png;base64,AAAA',makeEntry:(src,payload,source,title)=>({id:'image',src,payload,source,title}),addImage:async x=>images.push(x),listImages:()=>images});
  const send=(source=frame.contentWindow,type='meow-camera-open')=>w.dispatchEvent(new w.MessageEvent('message',{source,origin:'https://local.test',data:{type,requestId:'request',records:cameraRecords(mes).map(r=>r.text),index:0}}));
  const settle=()=>new Promise(r=>setTimeout(r,20));
- send({postMessage:()=>{}});assert.equal(opened,0);send();assert.equal(opened,1);
+ send({postMessage:()=>{}});assert.equal(opened,0);send();await settle();assert.equal(opened,1);
  const buttons=()=>[...document.querySelectorAll('.meow-camera button')];
  globalThis.fetch=async(_url,opts)=>{const body=JSON.parse(opts.body);requests.push(body);const id=JSON.parse(body.messages[1].content).passages[0].id;return {ok:true,json:async()=>({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'empty room',source_ids:[id]}]})}}]})};};
  buttons()[0].click();await settle();assert.equal(requests.length,1);assert.equal(JSON.parse(requests[0].messages[1].content).passages.length,1);assert.ok(!JSON.stringify(requests).includes('DO NOT SEND'));
