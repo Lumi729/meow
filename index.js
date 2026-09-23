@@ -225,8 +225,17 @@ export async function init(){
  on('tools-generate',()=>{page('draw');el('generate').click();});
  foldAll(root);foldHints(root);
  Promise.resolve().then(()=>fetch(new URL('manifest.json',import.meta.url))).then(r=>r.json()).then(m=>{if(m.version)el('version').textContent=m.version;}).catch(()=>{});
- let updateChecked=0;const updateCheck=async()=>{if(Date.now()-updateChecked<1800000)return;updateChecked=Date.now();const r=await checkUpdate(folder,ctx().getRequestHeaders());if(!r.known){el('update-state').textContent='暂时查不到有没有新版本（网络或酒馆没回应），可以直接点下面的按钮更新。';return;}el('update-dot').hidden=r.upToDate;el('update-state').textContent=r.upToDate?'已经是最新版 ♡':`发现新版本${r.latest?` ${r.latest}`:''}！点下面「更新 Meow 并刷新酒馆」就能装上。`;if(!r.upToDate)status(`猫猫有新版本${r.latest?` ${r.latest}`:''}，去「设置」点更新吧。`);};
- setTimeout(()=>updateCheck().catch(()=>{}),4000);root.querySelector('[data-page="config"]').addEventListener('click',()=>updateCheck().catch(()=>{}));
+ // Checks the repository through SillyTavern (git fetch): on load, every time Settings opens (at most once a minute), every 30 minutes, and on demand.
+ let updateChecked=0,updateBusy=false,announced=false;
+ const updateCheck=async(force=false)=>{if(updateBusy||(!force&&Date.now()-updateChecked<60000))return;updateBusy=true;updateChecked=Date.now();el('update-state').textContent='正在检查仓库有没有新版本…';
+  try{const r=await checkUpdate(folder,ctx().getRequestHeaders());const at=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+   if(!r.known){el('update-state').textContent=`暂时查不到有没有新版本（${at}，网络或酒馆没回应），可以直接点更新。`;return;}
+   el('update-dot').hidden=r.upToDate;el('update-state').textContent=r.upToDate?`已经是最新版 ♡（${at} 检查${r.commit?` · ${r.commit}`:''}）`:`发现新版本${r.latest?` ${r.latest}`:''}！点下面「更新 Meow 并刷新酒馆」就能装上。（${at} 检查）`;
+   if(!r.upToDate&&!announced){announced=true;status(`猫猫有新版本${r.latest?` ${r.latest}`:''}，去「设置」点更新吧。`);}
+  }finally{updateBusy=false;}};
+ setTimeout(()=>updateCheck(true).catch(()=>{}),4000);setInterval(()=>updateCheck(true).catch(()=>{}),1800000);
+ root.querySelector('[data-page="config"]').addEventListener('click',()=>updateCheck().catch(()=>{}));
+ on('check-update',()=>updateCheck(true));
  loadDraft();
  try{images=await store.list();renderGallery();renderPreviews();}catch{status('当前浏览器无法打开图库存储，生成后请及时下载。');}
 }

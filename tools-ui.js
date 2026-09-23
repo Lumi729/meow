@@ -1,5 +1,5 @@
 import { applyTools, toolsActive, encodeVibe, directorTool, pngText, stealthText, parseNaiMetadata, parseVibeFile, buildVibeFile, fitImage, sizeFor, padReference, maskFromStrokes, loadImage, fromBase64, shrinkImage, isV4Family, REFERENCE_TYPES, DIRECTOR_TOOLS, EMOTIONS } from './nai-tools.js';
-import { REVERSE_PROMPT, cleanTags } from './context.js';
+import { REVERSE_PROMPT, cleanTags, parseTagPreset } from './context.js';
 import { directRequest } from './advanced.js';
 import { characterParameters } from './characters.js';
 import { MODELS, SAMPLERS, SCHEDULERS } from './core.js';
@@ -86,6 +86,10 @@ export function mountTools({root,el,store,settings,secondary,advanced,drawFields
  async function setReverse(src){state.reverseImage=await shrinkImage(src);state.reverseResult='';persist();render();}
  el('reverse-prompt').value=secondary.reverse_prompt||REVERSE_PROMPT;
  on('reverse-prompt',()=>{secondary.reverse_prompt=el('reverse-prompt').value;save();},'input');
+ const setReversePrompt=text=>{secondary.reverse_prompt=text;el('reverse-prompt').value=text;save();};
+ on('reverse-import',async()=>{const f=el('reverse-import').files[0];if(!f)return;if(f.size>200000)throw new Error('文件太大（上限 200 KB）。');const text=parseTagPreset(await f.text(),f.name);if(!text.trim())throw new Error('文件里没有可用的文字要求。');setReversePrompt(text);el('reverse-import').value='';status('反推要求已导入，可以继续修改。');},'change');
+ on('reverse-export',()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({system_prompt:el('reverse-prompt').value},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='meow-reverse-prompt.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);});
+ on('reverse-default',()=>{if(!confirm('把反推要求恢复成默认？'))return;setReversePrompt(REVERSE_PROMPT);status('已恢复默认反推要求。');});
  on('reverse-result',()=>{state.reverseResult=el('reverse-result').value;persist();},'input');
  on('reverse-file',async()=>{const f=el('reverse-file').files[0];if(!f)return;await setReverse(await readFile(f));el('reverse-file').value='';status('图片已放好，点“用副 API 反推 tags”。');},'change');
  on('reverse-run',()=>run(async signal=>{if(!state.reverseImage)throw new Error('请先从相册选一张图。');status('正在让副 API 看图写 tags…');state.reverseResult=cleanTags(await reverseTags(state.reverseImage,el('reverse-prompt').value,signal));if(!state.reverseResult)throw new Error('副 API 没有返回 tags。');persist();render();const box=el('reverse-result').closest('details');if(box)box.open=true;status('反推完成，可以修改后填进「这次想画什么」。');}));

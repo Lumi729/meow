@@ -149,3 +149,13 @@
 #meow-panel details.meow-hint > summary::-webkit-details-marker { display:none; }
 #meow-panel details.meow-hint[open] > summary { background:#b66488; color:#fff; }
 #meow-panel details.meow-hint > small { text-align:left; margin-top:4px; padding:8px 10px; border-radius:10px; background:#fff0f6; }
+#meow-panel .meow-hint-row { display:flex; align-items:center; gap:8px; }
+#meow-panel .meow-hint-row > :first-child { flex:1 1 auto; min-width:0; }
+#meow-panel .meow-hint-row > label:first-child { margin-top:12px; }
+#meow-panel .meow-hint-alone { justify-content:flex-end; }
+#meow-panel .meow-hint-dot { flex:none; display:inline-grid; place-items:center; width:22px; height:22px; min-height:0; padding:0; margin:0; border:0; border-radius:50%; background:#f3c6d8; color:#8a3d5e; font-size:.75em; font-weight:700; line-height:1; }
+#meow-panel .meow-hint-dot[aria-expanded=true] { background:#b66488; color:#fff; }
+#meow-panel small.meow-hint-text { margin:2px 0 8px; padding:8px 10px; border-radius:10px; background:#fff0f6; }
+#meow-panel .meow-hint-row > button:first-child { flex:0 1 auto; }
+#meow-panel .meow-hint-row > .meow-hint-dot,#meow-panel summary > .meow-hint-dot { flex:none; width:22px; margin-left:auto; }
+#meow-panel .meow-hint-row > button:first-child + .meow-hint-dot { margin-left:0; }

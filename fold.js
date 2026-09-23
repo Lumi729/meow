@@ -20,13 +20,21 @@ export function foldAll(root){
  run(root);
  new (root.ownerDocument.defaultView.MutationObserver)(list=>{for(const m of list)m.addedNodes.forEach(run);}).observe(root,{childList:true,subtree:true});
 }
-// Long explanation lines shrink to a small round "!" that opens on tap.
+// Long explanation lines shrink to a small round "!" at the end of the line above; tap to show the text.
 export function foldHints(root){
  for(const small of [...root.querySelectorAll('small')]){
-  if(small.id||small.getAttribute('role')||small.children.length||small.closest('summary,.meow-hint,.meow-tool-item,.meow-gallery,.meow-quick')||small.textContent.trim().length<12)continue;
-  const doc=small.ownerDocument,details=doc.createElement('details'),summary=doc.createElement('summary');
-  details.className='meow-hint';summary.textContent='!';summary.setAttribute('aria-label','说明');summary.title='点开看说明';
+  if(small.id||small.getAttribute('role')||small.children.length||small.classList.contains('meow-hint-text')||small.closest('summary,.meow-tool-item,.meow-gallery,.meow-quick')||small.textContent.trim().length<12)continue;
+  const doc=small.ownerDocument,dot=doc.createElement('button');
+  dot.type='button';dot.className='meow-hint-dot';dot.textContent='!';dot.title='点开看说明';dot.setAttribute('aria-label','说明');dot.setAttribute('aria-expanded','false');
+  small.classList.add('meow-hint-text');small.hidden=true;
+  dot.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();small.hidden=!small.hidden;dot.setAttribute('aria-expanded',String(!small.hidden));});
   const label=small.parentElement?.tagName==='LABEL'?small.parentElement:null;
-  if(label){label.after(details);details.append(summary,small);}else{small.replaceWith(details);details.append(summary,small);}
+  let prev=label||small.previousElementSibling;
+  while(prev&&prev.classList.contains('meow-hint-text'))prev=prev.previousElementSibling;
+  if(label)label.after(small);
+  if(prev?.classList.contains('meow-hint-row'))prev.append(dot);
+  else if(prev?.matches('details')&&prev.querySelector(':scope > summary')&&prev.parentElement===small.parentElement)prev.querySelector(':scope > summary').append(dot);
+  else if(prev&&!prev.matches('details,hr')&&prev.parentElement===small.parentElement){const row=doc.createElement('div');row.className='meow-hint-row';prev.replaceWith(row);row.append(prev,dot);}
+  else{const row=doc.createElement('div');row.className='meow-hint-row meow-hint-alone';small.before(row);row.append(dot);}
  }
 }

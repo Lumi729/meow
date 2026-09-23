@@ -138,6 +138,8 @@ click('tools-reset');await settle();assert.equal($('vibe-list').children.length,
 const libCheck=$('vibe-lib-draw').querySelector('input[type=checkbox]');libCheck.checked=true;libCheck.dispatchEvent(new Event('change'));await settle();assert.ok($('vibe-on').checked);
 const before=vibeCalls.length;genBody=null;click('generate');await settle();assert.equal(vibeCalls.length,before);assert.deepEqual(genBody.parameters.reference_image_multiple,['AQID']);
 // Explanations fold into small round hints.
-assert.ok(document.querySelectorAll('#meow-panel details.meow-hint').length>5);assert.ok(!document.querySelector('#meow-panel details.meow-hint').open);
-console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
+const dot=document.querySelector('#meow-panel .meow-hint-dot');assert.ok(document.querySelectorAll('#meow-panel .meow-hint-dot').length>5);assert.ok(dot.closest('.meow-hint-row'));const hint=dot.closest('.meow-hint-row').nextElementSibling;assert.ok(hint.hidden);dot.click();assert.ok(!hint.hidden);
+// Reverse-tag prompt restores to default and exports like the tag preset.
+field('reverse-prompt','my reverse rules');assert.equal(extensionSettings.meow_secondary.reverse_prompt,'my reverse rules');click('reverse-default');await settle();assert.notEqual($('reverse-prompt').value,'my reverse rules');
+console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');process.exit(0);
 await window.happyDOM.abort();
