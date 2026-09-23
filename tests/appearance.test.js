@@ -33,3 +33,10 @@ test('person archives reuse stable identity across chats and rescan never replac
  const restored=JSON.parse(JSON.stringify(archive));assert.equal(restored['card:chen.png'].text,'我修改后的银发');assert.equal(restored['card:chen.png'].scannedText,'新扫描黑发');
  assert.match(formatAppearanceProfiles(restored,['card:chen.png']),/我修改后的银发/);assert.equal(formatAppearanceProfiles(restored,[]),'');
 });
+
+test('scan keeps people and their named extras, skips world/rule entries, always offers the user',async()=>{
+ const entries={a:{comment:'陈野',content:'外貌：黑色短发，灰色眼睛'},b:{comment:'陈野衣柜',content:'黑色皮夹克、工装裤'},c:{comment:'世界观',content:'这里的人头发很长，眼睛会发光'},d:{comment:'副本生成规则',content:'怪物红眼长发'},e:{content:'黑发，红眼'}};
+ const r=await scanAppearance({characters:[{name:'陈野',avatar:'c.png',description:'陈野'}],characterId:0,name1:'黎千',powerUserSettings:{},chatMetadata:{world_info:'w'},loadWorldInfo:async()=>({entries})},{});
+ const names=r.records.map(x=>x.name);assert.ok(names.includes('陈野衣柜'));assert.ok(names.includes('黎千'));
+ for(const junk of ['世界观','副本生成规则','待整理人物'])assert.ok(!names.includes(junk));
+});

@@ -58,3 +58,13 @@ DPM++ 2M SDE exists per NovelAI's official Summer Sampler Update and the user's 
 
 ## v0.4.0 inline messages
 Verified official ST docs and local 1.19 source: context.updateMessageBlock(messageId,message), context.saveChat(), CHAT_CHANGED/MESSAGE_UPDATED/MESSAGE_SWIPED/USER_MESSAGE_RENDERED/CHARACTER_MESSAGE_RENDERED. Inserts local uploaded image Markdown after exact captured source, updates current swipe text, persists variant metadata in message.extra.meow_inline. No new chat messages. Source snapshots strip only extension image markers and reject stale text.
+
+## 监控屏消息（0.5.4）
+
+监控 iframe 发给父页面的消息都需要 requestId 和与当前楼层 tracker_home 完全一致的 records 数组。除 meow-camera-open / meow-camera-list 外，新增：
+
+- `meow-camera-view` + `id`：在猫猫大图查看器里打开这张画面（查看器自带重绘和删除）。
+- `meow-camera-redraw` + `id`：用新种子重绘，存入图库后回传最新 `meow-camera-images`，并发送 `meow-camera-status`。
+- `meow-camera-delete` + `id`：从图库删除并回传最新 `meow-camera-images`。确认弹窗由监控屏自己负责。
+
+出错时回传 `meow-camera-error`（message 为中文说明）。

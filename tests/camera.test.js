@@ -9,8 +9,8 @@ test('iframe camera flow validates source, generates isolated tags and returns p
  document.body.innerHTML='<div id="chat"><div class="mes" mesid="0"><iframe></iframe></div></div><div id="panel"><section data-view="bad"></section></div>';
  const frame=document.querySelector('iframe'),out=[],images=[],requests=[];frame.contentWindow.postMessage=d=>out.push(d);
  const ctx={chat:[{mes,name:'Char'}],getCurrentChatId:()=> 'chat',getRequestHeaders:()=>({})};let key='chat',opened=0;
- const api=mountCamera({root:document.querySelector('#panel'),context:()=>ctx,chatKey:()=>key,panel:{open:()=>opened++,setMode:()=>{},dialog:{close:()=>{}}},page:()=>{},secondary:{url:'https://example.com/v1',model:'mock',secret_id:'local'},run:fn=>fn(new AbortController().signal),isBusy:()=>false,config:()=>({}),prepare:x=>x,png:async()=> 'data:image/png;base64,AAAA',makeEntry:(src,payload,source,title)=>({id:'image',src,payload,source,title}),addImage:async x=>images.push(x),listImages:()=>images});
- const send=(source=frame.contentWindow,type='meow-camera-open')=>w.dispatchEvent(new w.MessageEvent('message',{source,origin:'https://local.test',data:{type,requestId:'request',records:cameraRecords(mes).map(r=>r.text),index:0}}));
+ const api=mountCamera({root:document.querySelector('#panel'),context:()=>ctx,chatKey:()=>key,panel:{open:()=>opened++,setMode:()=>{},dialog:{close:()=>{}}},page:()=>{},secondary:{url:'https://example.com/v1',model:'mock',secret_id:'local'},run:fn=>fn(new AbortController().signal),isBusy:()=>false,config:()=>({}),prepare:x=>x,png:async()=> 'data:image/png;base64,AAAA',makeEntry:(src,payload,source,title)=>({id:'image',src,payload,source,title}),addImage:async x=>images.push(x),listImages:()=>images,viewEntry:id=>viewed.push(id),redrawEntry:async entry=>{const next={...entry,id:'redrawn'};images.push(next);return next;},removeEntry:async entry=>{images.splice(images.indexOf(entry),1);}});const viewed=[];
+ const send=(source=frame.contentWindow,type='meow-camera-open',extra={})=>w.dispatchEvent(new w.MessageEvent('message',{source,origin:'https://local.test',data:{type,requestId:'request',records:cameraRecords(mes).map(r=>r.text),index:0,...extra}}));
  const settle=()=>new Promise(r=>setTimeout(r,20));
  send({postMessage:()=>{}});assert.equal(opened,0);send();await settle();assert.equal(opened,1);
  const buttons=()=>[...document.querySelectorAll('.meow-camera button')];
@@ -18,6 +18,12 @@ test('iframe camera flow validates source, generates isolated tags and returns p
  buttons()[0].click();await settle();assert.equal(requests.length,1);assert.equal(JSON.parse(requests[0].messages[1].content).passages.length,1);assert.ok(JSON.parse(requests[0].messages[1].content).original_context.includes('DO NOT SEND'));assert.equal(JSON.parse(requests[0].messages[1].content).passages[0].text,'客厅｜午后，在线｜空沙发和窗边的猫。');
  buttons()[1].click();await settle();assert.equal(images.length,1);assert.equal(out.at(-1).images[0].record,'客厅｜午后，在线｜空沙发和窗边的猫。');
  send(frame.contentWindow,'meow-camera-list');assert.equal(out.at(-1).images.length,1);
+ // Monitor screen can open, redraw and delete its own pictures.
+ const shown=frame.contentDocument.createElement('img');shown.setAttribute('src','data:image/png;base64,AAAA');frame.contentDocument.body.append(shown);shown.click();assert.deepEqual(viewed,['image']);viewed.length=0;
+ send(frame.contentWindow,'meow-camera-view',{id:'image'});await settle();assert.deepEqual(viewed,['image']);
+ send(frame.contentWindow,'meow-camera-redraw',{id:'image'});await settle();assert.equal(images.length,2);assert.equal(out.filter(x=>x.type==='meow-camera-images').at(-1).images.length,2);
+ send(frame.contentWindow,'meow-camera-delete',{id:'redrawn'});await settle();assert.equal(images.length,1);assert.equal(out.filter(x=>x.type==='meow-camera-images').at(-1).images.length,1);
+ send(frame.contentWindow,'meow-camera-delete',{id:'missing'});await settle();assert.equal(out.at(-1).type,'meow-camera-error');
  key='other';buttons()[1].click();await settle();assert.equal(images.length,1);assert.match(document.querySelector('[role=status]').textContent,/变化/);
  api.dispose();w.happyDOM.abort();
 });

@@ -8,7 +8,7 @@ const root=new URL('../',import.meta.url).pathname;
 const window=new Window({url:'https://local.test'});
 for(const key of ['document','HTMLElement','HTMLDialogElement','Image','Option','Event','MouseEvent','Blob'])globalThis[key]=window[key];
 globalThis.Option=function(text,value){const o=window.document.createElement('option');o.textContent=text;o.value=value;return o;};
-globalThis.window=window;globalThis.innerWidth=390;globalThis.innerHeight=844;globalThis.indexedDB=indexedDB;
+globalThis.window=window;globalThis.localStorage=window.localStorage;globalThis.innerWidth=390;globalThis.innerHeight=844;globalThis.indexedDB=indexedDB;
 window.Image.prototype.decode=async()=>{};
 window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};
 globalThis.confirm=()=>true;
@@ -109,5 +109,13 @@ const personId=$('appearance-profile').value;assert.ok(personId);assert.match($(
 current='another-chat-same-character';await events.chat();assert.equal($('appearance-profile').value,personId);assert.equal($('appearance-text').value,'银发，蓝眼');
 field('appearance-text','银发，绿眼');click('appearance-save');await settle();assert.equal(extensionSettings.meow_people[personId].text,'银发，绿眼');
 $('appearance-use').checked=false;$('appearance-use').dispatchEvent(new Event('change'));await settle();assert.ok(!$('appearance-preview').value.includes('银发'));
+// Typed preview goes straight to the secondary API; captured text, preview and tags survive chat switches.
+assert.equal(extensionSettings.meow_last_preset,extensionSettings.meow_presets[0].id);
+current='chat-manual';await events.chat();$('character-mode').checked=false;$('character-mode').dispatchEvent(new Event('change'));
+let manualBody;globalThis.fetch=async(url,options)=>{if(url.includes('chat-completions')){manualBody=JSON.parse(options.body);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'girl in rain',source_ids:['manual']}]})}}]}));}return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
+field('send-preview','她站在雨里');click('tags');await settle();assert.match(manualBody.messages[1].content,/她站在雨里/);assert.equal($('scenes').querySelectorAll('select').length,0);assert.match($('tags-status').textContent,/图文相册/);
+await new Promise(r=>setTimeout(r,400));current='chat-other';await events.chat();assert.equal($('scenes').children.length,0);assert.equal($('send-preview').value,'');
+current='chat-manual';await events.chat();assert.equal($('send-preview').value,'她站在雨里');assert.equal($('scenes').querySelector('textarea').value,'girl in rain');
+click('bad-generate');await settle();const manualEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.source[0]?.id==='manual');assert.ok(manualEntry);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();

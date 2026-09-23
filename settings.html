@@ -27,7 +27,7 @@
   <label>补充分区规则（JSON，可选）<textarea id="meow-rules" rows="4" spellcheck="false"></textarea></label><small>自动识别 &lt;标签&gt;…&lt;/标签&gt;，支持中文、英文和属性；嵌套内容保留在最外层的一整对中，不拆开。自动识别的分区需手动勾选；特殊标记可用下面的 start/end 规则补充。</small>
   <button id="meow-capture" type="button">① 捕捉当前聊天</button>
   <details><summary>人物外貌档案 · 保存 / 检查 / 修改</summary><label><input id="meow-appearance-enabled" type="checkbox" checked>随原文发送已选人物档案</label><button id="meow-appearance-scan" type="button">扫描角色与关联世界书</button><p id="meow-appearance-state"></p><label>已保存的人物<select id="meow-appearance-profile"></select></label><label>人物姓名 / 称呼<input id="meow-appearance-name" placeholder="例如：陈野 / 黎千"></label><label><input id="meow-appearance-use" type="checkbox">在当前角色的聊天中使用此档案</label><small id="meow-appearance-source"></small><textarea id="meow-appearance-text" rows="8" placeholder="检查并填写发型、发色、眼睛、体型和服装；不同人物请分开保存。"></textarea><div class="meow-row"><button id="meow-appearance-save" type="button">保存人物档案</button><button id="meow-appearance-new" type="button">新建人物</button><button id="meow-appearance-latest" type="button">载入最新扫描候选</button><button id="meow-appearance-delete" type="button">删除档案</button></div><small>扫描不会覆盖已保存的修改。世界书条目可能包含多人，请检查姓名并按需拆成人物档案。未勾选的档案不发送；普通坏猫猫与监控生图共用已选档案。</small><label>实际发送的人物资料<textarea id="meow-appearance-preview" rows="5" readonly></textarea></label></details><div id="meow-context-list"></div>
-  <label>将发送的原文预览<textarea id="meow-send-preview" rows="6" readonly></textarea></label>
+  <label>将发送的原文预览（可直接改写或手写）<textarea id="meow-send-preview" rows="6" placeholder="懒得捕捉时，直接在这里写想画的内容，然后点②。"></textarea></label><small>在这里改过或手写的内容会原样发给副 API；这样生成的图放进图文相册，不插入正文。重新勾选上面的原文会恢复成勾选内容。捕捉的原文、预览和返回的 tags 会自动保存，关掉面板、切出去再回来都还在。</small>
   <p id="meow-destination"></p>
   <button id="meow-tags" type="button">② 只发送勾选内容，生成 tags</button>
   <p id="meow-tags-status" role="status" aria-live="polite"></p><details><summary>副 API 原始返回</summary><textarea id="meow-raw-tags" rows="5" readonly></textarea></details>
@@ -47,7 +47,7 @@
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
   <div id="meow-bad-latest"></div><small>tags 可以编辑后再生成。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><h3>扩展更新 · 0.5.3</h3><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><h3>扩展更新 · 0.5.4</h3><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <button id="meow-repair-inline" type="button">修复旧版正文插图并刷新</button><small>只移除旧版猫猫插图标记，保留原文和已存图片；新版本插图单独保存，不改正文代码。</small>
   <h3>✧ NovelAI</h3><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><label><input id="meow-remember-token" type="checkbox" checked>在此浏览器记住直连 Token</label><button id="meow-forget-token" type="button">清除浏览器记忆</button><button id="meow-save-token" type="button">保存本地 Token</button>
   <small>与酒馆共用 NovelAI 密钥；勾选记住后，直连凭证另存当前浏览器，刷新后复用。输入框保存后清空，不进入配置导出或仓库。</small>
