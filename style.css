@@ -193,3 +193,5 @@ dialog.meow-gift > * { position:relative; }
 #chat .meow-inline-card .meow-inline-photo { margin-left:auto !important; margin-right:auto !important; }
 .meow-inline-card .meow-inline-actions { justify-content:center; }
 .meow-inline-card > [role=status] { text-align:center; }
+/* 「给这段正文生成图片」spans the whole message width, text centered. */
+.meow-message-generate { display:block !important; width:100% !important; max-width:none !important; box-sizing:border-box !important; margin:10px 0 4px !important; text-align:center !important; justify-content:center; }
