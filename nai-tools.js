@@ -70,8 +70,31 @@ export function parseNaiMetadata(texts){
  const source=`${texts.Source||''} ${texts.Software||''}`;const model=MODEL_NAMES.find(([r])=>r.test(source))?.[1]||'';
  const pos=c.v4_prompt?.caption,neg=c.v4_negative_prompt?.caption;
  const characters=(pos?.char_captions||[]).map((ch,i)=>({name:`角色 ${i+1}`,prompt:ch.char_caption||'',negative_prompt:neg?.char_captions?.[i]?.char_caption||'',x:ch.centers?.[0]?.x??0.5,y:ch.centers?.[0]?.y??0.5})).filter(ch=>ch.prompt.trim());
- return {prompt:pos?.base_caption??c.prompt??texts.Description??'',negative:neg?.base_caption??c.uc??'',characters,model,
+ // Website features recorded in the metadata: img2img / inpaint strength, vibe transfer, precise reference.
+ const tools={},rt=String(c.request_type||c.action||'');
+ if(/infill|inpaint/i.test(rt))tools.mode='inpaint';else if(/img2img/i.test(rt)||(c.strength!==undefined&&c.noise!==undefined))tools.mode='img2img';
+ if(tools.mode){tools.strength=Number(c.strength??0.7);tools.noise=Number(c.noise??0);}
+ const list=v=>Array.isArray(v)?v:[],isImage=b=>/^(iVBOR|\/9j\/|UklGR)/.test(b);
+ const infos=list(c.reference_information_extracted_multiple),strengths=list(c.reference_strength_multiple);
+ tools.vibes=list(c.reference_image_multiple).filter(r=>typeof r==='string'&&r).map((r,i)=>({image:isImage(r)?`data:image/png;base64,${r}`:'',token:isImage(r)?'':r,info:Number(infos[i]??1),strength:Number(strengths[i]??0.6)}));
+ const descriptions=list(c.director_reference_descriptions),images=list(c.director_reference_images),rs=list(c.director_reference_strength_values),second=list(c.director_reference_secondary_strength_values);
+ tools.references=Array.from({length:Math.max(descriptions.length,images.length,rs.length)},(_,i)=>({type:descriptions[i]?.caption?.base_caption||'character&style',strength:Number(rs[i]??1),fidelity:Math.round((1-Number(second[i]??0))*100)/100,image:typeof images[i]==='string'&&images[i]?`data:image/png;base64,${images[i]}`:''}));
+ const extras={decrisper:!!c.dynamic_thresholding,variety_boost:c.skip_cfg_above_sigma!=null,quality:!!c.qualityToggle,ucPreset:c.ucPreset,samples:c.n_samples};
+ return {prompt:pos?.base_caption??c.prompt??texts.Description??'',negative:neg?.base_caption??c.uc??'',characters,model,tools,extras,
   settings:{width:c.width,height:c.height,steps:c.steps,scale:c.scale,cfg_rescale:c.cfg_rescale,sampler:c.sampler,scheduler:c.noise_schedule},seed:c.seed};
+}
+/** NovelAI also hides the metadata in the alpha channel ("stealth" PNG info); read it when text chunks are gone. */
+export async function stealthText(src){
+ const img=await loadImage(src),w=img.naturalWidth,h=img.naturalHeight,c=canvas(w,h),g=c.getContext('2d',{willReadFrequently:true});g.drawImage(img,0,0);
+ const px=g.getImageData(0,0,w,h).data;let bit=0;
+ const next=()=>{const x=Math.floor(bit/h),y=bit%h;bit++;if(x>=w)throw new Error('end');return px[(y*w+x)*4+3]&1;};
+ const bytes=n=>{const out=new Uint8Array(n);for(let i=0;i<n;i++){let v=0;for(let b=0;b<8;b++)v=(v<<1)|next();out[i]=v;}return out;};
+ try{
+  const sig=new TextDecoder('latin1').decode(bytes(15));if(sig!=='stealth_pngcomp'&&sig!=='stealth_pnginfo')return null;
+  let len=0;for(let b=0;b<32;b++)len=len*2+next();if(len<=0||len%8||len/8>w*h)return null;
+  let data=bytes(len/8);if(sig==='stealth_pngcomp')data=await inflate(data,'gzip');
+  const raw=JSON.parse(new TextDecoder().decode(data));if(raw&&typeof raw.Comment==='object')raw.Comment=JSON.stringify(raw.Comment);return raw;
+ }catch{return null;}
 }
 
 /** Official responses: JSON {images}, a ZIP with image_0.png, or a bare PNG. Returns base64 PNG. */
@@ -144,3 +167,21 @@ export function maskFromStrokes(strokes,width,height){
 }
 /** Shrinks any picture to at most `max` px on the long side as JPEG (for sending to a chat model). */
 export async function shrinkImage(src,max=1024){const img=await loadImage(src),s=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),c=canvas(Math.round(img.naturalWidth*s),Math.round(img.naturalHeight*s)),g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',0.9);}
+
+// NovelAI vibe files (.naiv4vibe): an image plus per-model encodings, so a saved vibe is reused without re-encoding.
+export const VIBE_MODEL_KEYS=Object.freeze({'nai-diffusion-4-full':'v4full','nai-diffusion-4-curated-preview':'v4curated','nai-diffusion-4-5-full':'v4-5full','nai-diffusion-4-5-curated':'v4-5curated'});
+export function parseVibeFile(text,fallbackName='氛围'){
+ let raw;try{raw=JSON.parse(text);}catch{throw new Error('氛围文件不是有效的 JSON。');}
+ if(!raw||typeof raw!=='object')throw new Error('氛围文件格式不对。');
+ const models=Object.fromEntries(Object.entries(VIBE_MODEL_KEYS).map(([m,k])=>[k,m])),tokens={};let info=Number(raw.importInfo?.information_extracted);
+ for(const [key,group] of Object.entries(raw.encodings||{})){const model=models[key];if(!model||!group||typeof group!=='object')continue;
+  for(const item of Object.values(group)){const enc=item?.encoding,ie=Number(item?.params?.information_extracted??1);if(typeof enc==='string'&&enc){tokens[`${model}|${Math.round(ie*100)/100}`]=enc;if(!Number.isFinite(info))info=ie;}}}
+ const image=typeof raw.image==='string'&&raw.image?(raw.image.startsWith('data:')?raw.image:`data:image/png;base64,${raw.image}`):'';
+ if(!image&&!Object.keys(tokens).length)throw new Error('氛围文件里没有图片也没有编码。');
+ return {name:String(raw.name||fallbackName).slice(0,80),image,thumbnail:typeof raw.thumbnail==='string'?raw.thumbnail:'',info:Number.isFinite(info)?Math.round(info*100)/100:1,strength:Number.isFinite(Number(raw.importInfo?.strength))?Number(raw.importInfo.strength):0.6,tokens};
+}
+export function buildVibeFile(item){
+ const encodings={};
+ for(const [key,enc] of Object.entries(item.tokens||{})){const [model,ie]=key.split('|'),mk=VIBE_MODEL_KEYS[model];if(!mk)continue;(encodings[mk]??={})[`meow-${ie}`]={encoding:enc,params:{information_extracted:Number(ie)}};}
+ return JSON.stringify({identifier:'novelai-vibe-transfer',version:1,type:item.image?'image':'encoding',image:item.image?strip(item.image):undefined,id:item.id,encodings,name:item.name,thumbnail:item.thumbnail||undefined,createdAt:item.created||Date.now(),importInfo:{model:'nai-diffusion-4-5-full',information_extracted:item.info,strength:item.strength}},null,1);
+}

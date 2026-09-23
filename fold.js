@@ -20,3 +20,13 @@ export function foldAll(root){
  run(root);
  new (root.ownerDocument.defaultView.MutationObserver)(list=>{for(const m of list)m.addedNodes.forEach(run);}).observe(root,{childList:true,subtree:true});
 }
+// Long explanation lines shrink to a small round "!" that opens on tap.
+export function foldHints(root){
+ for(const small of [...root.querySelectorAll('small')]){
+  if(small.id||small.getAttribute('role')||small.children.length||small.closest('summary,.meow-hint,.meow-tool-item,.meow-gallery,.meow-quick')||small.textContent.trim().length<12)continue;
+  const doc=small.ownerDocument,details=doc.createElement('details'),summary=doc.createElement('summary');
+  details.className='meow-hint';summary.textContent='!';summary.setAttribute('aria-label','说明');summary.title='点开看说明';
+  const label=small.parentElement?.tagName==='LABEL'?small.parentElement:null;
+  if(label){label.after(details);details.append(summary,small);}else{small.replaceWith(details);details.append(summary,small);}
+ }
+}

@@ -11,7 +11,7 @@ globalThis.Option=function(text,value){const o=window.document.createElement('op
 globalThis.window=window;globalThis.localStorage=window.localStorage;globalThis.innerWidth=390;globalThis.innerHeight=844;globalThis.indexedDB=indexedDB;
 window.Image.prototype.decode=async()=>{};
 window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};
-globalThis.confirm=()=>true;
+globalThis.confirm=()=>true;globalThis.prompt=()=>'测试氛围';
 const events={};
 const extensionSettings={meow_secondary:{url:'https://aux.test/v1',model:'aux-model',secret_id:'mock-id',preset:'tags',context_count:5,image_count:1,rules:JSON.stringify([{name:'正文',start:'<正文>',end:'</正文>'},{name:'状态栏',start:'<状态栏>',end:'</状态栏>'}]),output:'journal'}};
 let current='chat-a';
@@ -128,5 +128,16 @@ click('generate');await settle();assert.equal(vibeCalls.length,1);assert.equal(v
 click('generate');await settle();assert.equal(vibeCalls.length,1);
 // Website tools live on their own page; the drawing page keeps quick buttons.
 click('close');click('floating');document.querySelector('[data-page="draw"]').click();document.querySelector('[data-tool-jump="director"]').click();await settle();assert.ok(!document.querySelector('[data-view="tools"]').hidden);assert.ok(document.querySelector('[data-view="draw"]').hidden);
+// Website tools can take pictures straight from Meow's gallery.
+document.querySelector('[data-gallery-pick="vibe"]').click();await settle();assert.ok($('gallery-picker')?.open||document.querySelector('#meow-gallery-picker').open);document.querySelector('#meow-gallery-picker .meow-pick-item').click();await settle();assert.match($('tools-badge').textContent,/氛围×2/);
+// Vibe library: save once, switch on/off from the drawing page, reuse the saved encoding.
+[...$('vibe-list').querySelectorAll('button')].find(b=>b.textContent==='存进氛围库').click();await settle();assert.match($('vibe-lib-draw').textContent,/测试氛围/);
+$('vibe-on').checked=false;$('vibe-on').dispatchEvent(new Event('change'));await settle();assert.match($('vibe-summary').textContent,/不用/);
+genBody=null;document.querySelector('[data-page="draw"]').click();click('generate');await settle();assert.ok(genBody);assert.equal(genBody.parameters.reference_image_multiple,undefined);
+click('tools-reset');await settle();assert.equal($('vibe-list').children.length,0);
+const libCheck=$('vibe-lib-draw').querySelector('input[type=checkbox]');libCheck.checked=true;libCheck.dispatchEvent(new Event('change'));await settle();assert.ok($('vibe-on').checked);
+const before=vibeCalls.length;genBody=null;click('generate');await settle();assert.equal(vibeCalls.length,before);assert.deepEqual(genBody.parameters.reference_image_multiple,['AQID']);
+// Explanations fold into small round hints.
+assert.ok(document.querySelectorAll('#meow-panel details.meow-hint').length>5);assert.ok(!document.querySelector('#meow-panel details.meow-hint').open);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();

@@ -126,3 +126,26 @@
 #meow-panel .meow-quick button { margin:4px 0; padding:7px 10px; font-size:.8em; }
 #meow-panel [data-view=tools] h4 { margin:20px 0 4px; font-size:.95em; color:#8a5570; border-top:1px dashed #eedce5; padding-top:12px; }
 #meow-panel #meow-tools-badge,#meow-panel #meow-tools-badge-page { color:#b66488; font-weight:600; font-size:.9em; }
+#meow-panel .meow-pick { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+#meow-panel .meow-pick > button { margin:10px 0; padding:10px; font-size:.84em; }
+#meow-gallery-picker { width:min(680px,calc(100vw - 12px)); max-width:none; max-height:calc(100dvh - 12px); padding:12px; border:0; border-radius:18px; background:#fff8fb; color:#674350; overflow:auto; }
+#meow-gallery-picker::backdrop { background:#33223285; }
+#meow-gallery-picker .meow-row { display:flex; justify-content:space-between; align-items:center; }
+#meow-gallery-picker h3 { margin:0; font-size:1em; }
+#meow-gallery-picker button { padding:8px 12px; border:1px solid #ddb3c5; border-radius:12px; background:#ffe6ef; color:#674350; font:inherit; }
+#meow-gallery-picker .meow-pick-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:10px; }
+#meow-gallery-picker .meow-pick-item { padding:0; overflow:hidden; background:#fceaf1; border:0; text-align:left; }
+#meow-gallery-picker .meow-pick-item img { display:block; width:100%; aspect-ratio:3/4; object-fit:cover; }
+#meow-gallery-picker .meow-pick-item small { display:block; padding:3px 5px; font-size:.72em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#meow-panel .meow-vibe-row { display:grid; grid-template-columns:minmax(0,1fr) 92px; gap:8px; align-items:center; padding:6px 0; border-bottom:1px dashed #f0dbe5; }
+#meow-panel .meow-vibe-row > label:first-child { display:flex; align-items:center; gap:8px; margin:0; min-width:0; }
+#meow-panel .meow-vibe-row .meow-tool-thumb { width:44px; height:58px; object-fit:cover; border-radius:8px; flex:none; }
+#meow-panel .meow-vibe-row span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#meow-panel .meow-vibe-row > label:last-child { margin:0; font-size:.78em; }
+#meow-panel .meow-vibe-row > label:last-child input { margin:2px 0 0; padding:6px; }
+#meow-panel #meow-vibe-summary { color:#b66488; font-weight:600; }
+#meow-panel details.meow-hint { display:block; margin:-4px 0 6px; text-align:right; }
+#meow-panel details.meow-hint > summary { display:inline-grid; place-items:center; width:20px; height:20px; border-radius:50%; background:#f3c6d8; color:#8a3d5e; font-size:.75em; font-weight:700; line-height:1; cursor:pointer; list-style:none; }
+#meow-panel details.meow-hint > summary::-webkit-details-marker { display:none; }
+#meow-panel details.meow-hint[open] > summary { background:#b66488; color:#fff; }
+#meow-panel details.meow-hint > small { text-align:left; margin-top:4px; padding:8px 10px; border-radius:10px; background:#fff0f6; }

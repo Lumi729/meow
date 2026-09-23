@@ -9,6 +9,11 @@
   <label>✦ 这次想画什么<textarea id="meow-prompt" rows="4" placeholder="a fluffy white cat, pink bow, twinkling stars"></textarea></label>
   <label>固定负面<textarea id="meow-negative_prompt" rows="2" placeholder="不希望每张图出现的内容"></textarea></label>
   <label>本次补充负面<textarea id="meow-extra_negative" rows="2"></textarea></label>
+  <details class="meow-list" id="meow-vibe-box"><summary>氛围 Vibe · <span id="meow-vibe-summary">不用</span></summary>
+   <label><input id="meow-vibe-on" type="checkbox" checked>这次生图用氛围</label>
+   <div id="meow-vibe-lib-draw"></div>
+   <button type="button" data-tool-jump="vibelib">管理氛围库 / 添加新氛围</button>
+  </details>
   <button id="meow-generate" type="button" class="meow-primary">✦ 猫猫，开始画画</button>
   <details class="meow-drawing-params"><summary>绘图参数 · 模型 / 尺寸 / 采样器</summary>  <div class="meow-grid"><label>模型<select id="meow-model"></select></label><label>尺寸预设<select id="meow-size"><option value="">自定义</option><option value="832x1216">竖图 832 × 1216</option><option value="1216x832">横图 1216 × 832</option><option value="1024x1024">方图 1024 × 1024</option><option value="512x768">小竖图 512 × 768</option></select></label><label>宽度<input id="meow-width" type="number" min="64" max="2048" step="64"></label><label>高度<input id="meow-height" type="number" min="64" max="2048" step="64"></label><label>步数<input id="meow-steps" type="number" min="1" max="50"></label><label>提示词引导<input id="meow-scale" type="number" min="0" max="10" step="0.1"></label><label>Prompt Guidance Rescale<input id="meow-cfg_rescale" type="number" min="0" max="1" step="0.01" placeholder="0.18"><small>0 表示关闭；例如 0.18。非零值自动使用完整参数请求。</small></label><label>采样器<select id="meow-sampler"></select></label><label>噪声计划<select id="meow-scheduler"></select></label><label>种子（-1 随机）<input id="meow-seed" type="number" min="-1" max="4294967295"></label><label>放大倍数<select id="meow-upscale_ratio"><option value="1">不放大</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
   <div class="meow-checks"><label><input id="meow-decrisper" type="checkbox">Decrisper</label><label><input id="meow-variety_boost" type="checkbox">Variety Boost</label><label><input id="meow-sm" type="checkbox">SMEA（V2/V3）</label><label><input id="meow-sm_dyn" type="checkbox">SMEA DYN</label><label><input id="meow-anlas_guard" type="checkbox">节省模式：≤28 步、≤1MP、不放大</label></div>
@@ -22,19 +27,23 @@
    <small>这些功能直连 NovelAI 官网：需要在设置里保存 Token，按官网规则消耗 Anlas。图库大图里点「用这张图…」可以直接把图带过来。</small>
    <h4 id="meow-sec-base">基础图</h4>
    <label>模式<select id="meow-tool-mode"><option value="generate">不用基础图（文生图）</option><option value="img2img">图生图</option><option value="inpaint">局部重绘</option></select></label>
-   <label class="meow-file">从相册选基础图<input id="meow-tool-image-file" type="file" accept="image/*"></label>
+   <div class="meow-pick"><label class="meow-file">从相册选基础图<input id="meow-tool-image-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="base">从猫猫图库选</button></div>
    <div id="meow-tool-preview" class="meow-tool-preview"></div>
    <div class="meow-grid"><label>重绘强度（0.01–0.99）<input id="meow-tool-strength" type="number" min="0.01" max="0.99" step="0.01"></label><label>噪声（图生图，0–0.99）<input id="meow-tool-noise" type="number" min="0" max="0.99" step="0.01"></label></div>
    <label><input id="meow-tool-original" type="checkbox" checked>局部重绘时叠加原图（没涂的地方保持原样）</label>
    <div class="meow-row"><button id="meow-tool-mask" type="button">画蒙版</button><button id="meow-tool-size" type="button">尺寸跟随基础图</button><button id="meow-tool-clear" type="button">移除基础图</button></div>
    <h4 id="meow-sec-vibe">氛围迁移 · Vibe Transfer</h4>
-   <label class="meow-file">从相册添加氛围参考图<input id="meow-vibe-file" type="file" accept="image/*"></label><div id="meow-vibe-list"></div>
+   <div class="meow-pick"><label class="meow-file">从相册添加氛围参考图<input id="meow-vibe-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="vibe">从猫猫图库选</button></div><div id="meow-vibe-list"></div>
+   <h4 id="meow-sec-vibelib">氛围库</h4>
+   <div class="meow-pick"><label class="meow-file">导入到氛围库（相册图片或 .naiv4vibe 文件）<input id="meow-vibelib-file" type="file" accept="image/*,.naiv4vibe,.json"></label><button type="button" data-gallery-pick="vibelib">从猫猫图库选</button></div>
+   <div id="meow-vibelib-list"></div>
+   <small>氛围库像固定正面一样长期保存：起好名字，星绘页的「氛围」里勾选就能用。编码过的结果也一起存着，下次不用再花 Anlas 编码。可以导出成官网的 .naiv4vibe 文件。</small>
    <small>V4 以后每张参考图第一次使用要先编码（官网会收少量 Anlas），同一张图、同样的信息提取值之后不再重复编码。V5 暂不支持氛围迁移。</small>
    <h4 id="meow-sec-reference">精确参考 · Precise Reference</h4>
-   <label class="meow-file">从相册添加精确参考图<input id="meow-ref-file" type="file" accept="image/*"></label><div id="meow-ref-list"></div>
+   <div class="meow-pick"><label class="meow-file">从相册添加精确参考图<input id="meow-ref-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="reference">从猫猫图库选</button></div><div id="meow-ref-list"></div>
    <small>支持 V4.5 / V5。图片会自动补黑边成官网要求的尺寸。</small>
    <h4 id="meow-sec-reverse">看图反推 tags</h4>
-   <label class="meow-file">从相册选任意图片<input id="meow-reverse-file" type="file" accept="image/*"></label>
+   <div class="meow-pick"><label class="meow-file">从相册选任意图片<input id="meow-reverse-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="reverse">从猫猫图库选</button></div>
    <div id="meow-reverse-preview" class="meow-tool-preview"></div>
    <label>反推要求（发给副 API）<textarea id="meow-reverse-prompt" rows="3"></textarea></label>
    <button id="meow-reverse-run" type="button">用副 API 反推 tags</button>
@@ -42,9 +51,9 @@
    <div class="meow-row"><button id="meow-reverse-replace" type="button">填进「这次想画什么」</button><button id="meow-reverse-append" type="button">追加到「这次想画什么」</button></div>
    <small>任何图都行（网图、截图、别人画的）。图片会缩到 1024 像素以内发给设置里的副 API，需要模型能看图（例如 Gemini、GPT-4o、Claude）。</small>
    <h4 id="meow-sec-meta">读取 NovelAI 原图信息</h4>
-   <label class="meow-file">从相册选 NovelAI 原图<input id="meow-meta-file" type="file" accept="image/*"></label>
+   <div class="meow-pick"><label class="meow-file">从相册选 NovelAI 原图<input id="meow-meta-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="meta">从猫猫图库选</button></div>
    <label>读到的信息<textarea id="meow-meta-view" rows="5" readonly placeholder="读取后在这里显示提示词和参数"></textarea></label>
-   <div class="meow-checks"><label><input id="meow-meta-prompt" type="checkbox" checked>正面</label><label><input id="meow-meta-negative" type="checkbox" checked>负面</label><label><input id="meow-meta-characters" type="checkbox" checked>角色</label><label><input id="meow-meta-settings" type="checkbox" checked>参数</label><label><input id="meow-meta-seed" type="checkbox">种子</label></div>
+   <div class="meow-checks"><label><input id="meow-meta-prompt" type="checkbox" checked>正面</label><label><input id="meow-meta-negative" type="checkbox" checked>负面</label><label><input id="meow-meta-characters" type="checkbox" checked>角色</label><label><input id="meow-meta-settings" type="checkbox" checked>参数</label><label><input id="meow-meta-seed" type="checkbox">种子</label><label><input id="meow-meta-tools" type="checkbox" checked>官网功能（图生图 / 氛围 / 精确参考）</label></div>
    <button id="meow-meta-import" type="button">导入到星绘</button>
    <h4 id="meow-sec-director">导演工具与放大</h4>
    <label>工具<select id="meow-director-tool"></select></label>

@@ -48,3 +48,17 @@ test('reverse tagging sends the picture as an image_url message to the secondary
  assert.throws(()=>buildReverseRequest({url:'https://api.example/v1'},'data:image/jpeg;base64,AA'),/模型/);
  assert.equal(cleanTags('```\n1girl, smile,\nwhite hair\n```'),'1girl, smile, white hair');
 });
+test('vibe files keep image and per-model encodings through export and import',async()=>{
+ const {buildVibeFile,parseVibeFile}=await import('../nai-tools.js');
+ const item={id:'vibe:1',name:'粉色梦境',image:'data:image/png;base64,AAAA',info:0.8,strength:0.5,tokens:{'nai-diffusion-4-5-full|0.8':'ENC'}};
+ const back=parseVibeFile(buildVibeFile(item));assert.equal(back.name,'粉色梦境');assert.equal(back.image,'data:image/png;base64,AAAA');assert.deepEqual(back.tokens,{'nai-diffusion-4-5-full|0.8':'ENC'});assert.equal(back.info,0.8);assert.equal(back.strength,0.5);
+ const onlyEncoding=parseVibeFile(JSON.stringify({identifier:'novelai-vibe-transfer',encodings:{'v4-5curated':{x:{encoding:'E2',params:{information_extracted:1}}}}}),'文件名');assert.equal(onlyEncoding.name,'文件名');assert.deepEqual(onlyEncoding.tokens,{'nai-diffusion-4-5-curated|1':'E2'});
+ assert.throws(()=>parseVibeFile('{}'),/没有/);assert.throws(()=>parseVibeFile('nope'),/JSON/);
+});
+test('metadata lists the website features the picture used',()=>{
+ const comment={prompt:'p',uc:'u',request_type:'Img2ImgRequest',strength:0.6,noise:0.1,reference_image_multiple:['VIBEENC'],reference_strength_multiple:[0.5],reference_information_extracted_multiple:[0.9],director_reference_descriptions:[{caption:{base_caption:'character'}}],director_reference_strength_values:[0.8],director_reference_secondary_strength_values:[0.25],dynamic_thresholding:true,skip_cfg_above_sigma:58};
+ const m=parseNaiMetadata({Comment:JSON.stringify(comment)});
+ assert.equal(m.tools.mode,'img2img');assert.equal(m.tools.strength,0.6);assert.deepEqual(m.tools.vibes,[{image:'',token:'VIBEENC',info:0.9,strength:0.5}]);
+ assert.deepEqual(m.tools.references,[{type:'character',strength:0.8,fidelity:0.75,image:''}]);assert.ok(m.extras.decrisper&&m.extras.variety_boost);
+ assert.equal(parseNaiMetadata({Comment:'{"prompt":"x"}'}).tools.mode,undefined);
+});
