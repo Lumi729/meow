@@ -141,5 +141,9 @@ const before=vibeCalls.length;genBody=null;click('generate');await settle();asse
 const dot=document.querySelector('#meow-panel .meow-hint-dot');assert.ok(document.querySelectorAll('#meow-panel .meow-hint-dot').length>5);assert.ok(dot.closest('.meow-hint-row'));const hint=dot.closest('.meow-hint-row').nextElementSibling;assert.ok(hint.hidden);dot.click();assert.ok(!hint.hidden);
 // Reverse-tag prompt restores to default and exports like the tag preset.
 field('reverse-prompt','my reverse rules');assert.equal(extensionSettings.meow_secondary.reverse_prompt,'my reverse rules');click('reverse-default');await settle();assert.notEqual($('reverse-prompt').value,'my reverse rules');
+// Global theme {name, css} applies immediately and survives in settings.
+field('theme-title','黑白画室');$('theme-css').value='#meow-panel{background:#fff}';click('theme-apply');await settle();assert.equal(document.getElementById('meow-theme-style').textContent,'#meow-panel{background:#fff}');assert.equal(extensionSettings.meow_theme.name,'黑白画室');
+$('theme-css').value='</style><script>';click('theme-apply');await settle();assert.equal(extensionSettings.meow_theme.css,'#meow-panel{background:#fff}');
+click('theme-reset');await settle();assert.equal(document.getElementById('meow-theme-style').textContent,'');
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');process.exit(0);
 await window.happyDOM.abort();

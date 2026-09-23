@@ -102,6 +102,36 @@ export async function init(){
  const launcherFields=[['top-enabled','top_enabled','check'],['floating-enabled','enabled','check'],['floating-size','normal_size','number'],['bad-size','bad_size','number'],['top-image','top_image','text'],['normal-image','normal_image','text'],['bad-image','bad_image','text']];
  const launcherValues=()=>{launcherFields.forEach(([id,k,t])=>{if(t==='check')el(id).checked=ui[k]!==false;else el(id).value=ui[k]??'';});el('size-output').textContent=`${ui.normal_size||64}px`;el('bad-size-output').textContent=`${ui.bad_size||64}px`;};launcherValues();
  launcherFields.forEach(([id,k,t])=>on(id,()=>{if(t==='text'&&el(id).value.trim()&&!el(id).value.startsWith('https://'))throw new Error('图片链接需以 https:// 开头。');ui[k]=t==='check'?el(id).checked:t==='number'?Number(el(id).value):el(id).value.trim();save();panel.refresh();launcherValues();},t==='text'?'change':'input'));
+ // Global theme: {name, css}; the CSS is layered after Meow's own stylesheet and follows every page and dialog.
+ ext.meow_theme??={name:'',css:''};
+ const THEME_SAMPLE=`/* 猫猫星绘 常用选择器（删掉不需要的，改颜色即可） */
+#meow-dialog { background:#fff8fb; }              /* 整个面板外框 */
+#meow-panel { background:#fff8fb; color:#674350; } /* 面板底色、文字 */
+#meow-panel .meow-tabs button { }                  /* 顶部标签 */
+#meow-panel .meow-tabs button[aria-pressed=true] { } /* 当前标签 */
+#meow-panel button { }                             /* 所有按钮 */
+#meow-panel .meow-primary { }                      /* 主按钮（开始画画等） */
+#meow-panel input, #meow-panel select, #meow-panel textarea { } /* 输入框 */
+#meow-panel details.meow-fold { }                  /* 折叠框 */
+#meow-panel .meow-hint-dot { }                     /* 小圆「!」 */
+#meow-panel small { }                              /* 说明文字 */
+#meow-viewer { }                                   /* 大图查看 */
+#meow-gallery-picker, #meow-mask-editor { }        /* 选图 / 画蒙版窗口 */
+#meow-floating { }                                 /* 悬浮按钮 */
+.meow-inline-card { }                              /* 正文里的插图卡片 */
+`;
+ const themeStyle=document.getElementById('meow-theme-style')||Object.assign(document.createElement('style'),{id:'meow-theme-style'});document.head.append(themeStyle);
+ const cleanCss=css=>{css=String(css??'');if(css.length>500000)throw new Error('CSS 太大（上限 500 KB）。');if(/<\/?style|<script/i.test(css))throw new Error('CSS 里不能有 <style> 或 <script> 标签。');return css;};
+ const applyTheme=()=>{themeStyle.textContent=ext.meow_theme.css||'';el('theme-title').value=ext.meow_theme.name||'';el('theme-css').value=ext.meow_theme.css||'';el('theme-state').textContent=ext.meow_theme.css?`当前美化：${ext.meow_theme.name||'未命名'}`:'当前是默认样式';};
+ const setTheme=(name,css)=>{ext.meow_theme={name:String(name||'').slice(0,80),css:cleanCss(css)};save();applyTheme();};
+ applyTheme();
+ on('theme-apply',()=>{setTheme(el('theme-title').value.trim(),el('theme-css').value);status('美化已应用。');});
+ on('theme-sample',()=>{if(el('theme-css').value.trim()&&!confirm('把选择器示例加到现在的 CSS 后面？'))return;el('theme-css').value=`${el('theme-css').value.trim()?`${el('theme-css').value.trim()}\n\n`:''}${THEME_SAMPLE}`;status('示例已填入，改好后点“应用 CSS”。');});
+ on('theme-reset',()=>{if(!confirm('恢复默认样式？当前美化会被清空（建议先导出）。'))return;setTheme('','');status('已恢复默认样式。');});
+ on('theme-export',()=>{const name=el('theme-title').value.trim()||ext.meow_theme.name||'猫猫星绘美化';download(`${name}.json`,JSON.stringify({name,css:el('theme-css').value},null,2));});
+ on('theme-import',async()=>{const f=el('theme-import').files[0];if(!f)return;if(f.size>600000)throw new Error('美化文件太大（上限 500 KB）。');const text=await f.text();let name=f.name.replace(/\.[^.]+$/,''),css=text;
+  if(/\.json$/i.test(f.name)){let raw;try{raw=JSON.parse(text);}catch{throw new Error('美化文件不是有效的 JSON。');}if(!raw||typeof raw.css!=='string')throw new Error('美化文件里要有 css 字段：{"name":"名字","css":"…"}');name=typeof raw.name==='string'&&raw.name.trim()?raw.name.trim():name;css=raw.css;}
+  setTheme(name,css);el('theme-import').value='';status(`已导入并应用美化：${name}`);},'change');
  on('launcher-reset',()=>{panel.reset();launcherValues();status('已恢复小动物手机和爱字图片，悬浮按钮回到右侧。');});
  ext.meow_people??={};ext.meow_cast_profiles??={};
  const archive=ext.meow_people;
