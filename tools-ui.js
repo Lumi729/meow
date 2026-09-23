@@ -36,7 +36,7 @@ export function mountTools({root,el,store,settings,secondary,advanced,drawFields
    const remove=node('button','移除');remove.type='button';remove.addEventListener('click',()=>{state.references.splice(i,1);persist();render();});
    card.append(thumb(r.image),head,typeLabel,number('参考强度（0–1）',r.strength,0,1,0.01,x=>{r.strength=x;}),number('保真度（0–1）',r.fidelity,0,1,0.01,x=>{r.fidelity=x;}),remove);refs.append(card);});
   el('meta-view').value=state.meta?describe(state.meta):'';
-  const rp=el('reverse-preview');rp.replaceChildren();if(state.reverseImage){const w=node('div','','meow-tool-stack');w.append(thumb(state.reverseImage));rp.append(w);}
+  const rp=el('reverse-preview');rp.replaceChildren();if(state.reverseImage){const w=node('div','','meow-tool-stack');w.append(thumb(state.reverseImage));const drop=node('button','移除图片');drop.type='button';drop.addEventListener('click',()=>{state.reverseImage='';persist();render();status('已移除反推图片。');});rp.append(w,drop);}
   if(el('reverse-result').value!==state.reverseResult)el('reverse-result').value=state.reverseResult||'';badge();
  }
  const toolText=m=>{const t=m.tools||{},out=[];if(t.mode)out.push(`${t.mode==='inpaint'?'局部重绘':'图生图'}（强度 ${t.strength}${t.mode==='img2img'?`，噪声 ${t.noise}`:''}）`);

@@ -159,3 +159,5 @@
 #meow-panel .meow-hint-row > button:first-child { flex:0 1 auto; }
 #meow-panel .meow-hint-row > .meow-hint-dot,#meow-panel summary > .meow-hint-dot { flex:none; width:22px; margin-left:auto; }
 #meow-panel .meow-hint-row > button:first-child + .meow-hint-dot { margin-left:0; }
+#meow-panel h3 > .meow-hint-dot,#meow-panel h4 > .meow-hint-dot { display:inline-grid; margin:0 0 0 8px; vertical-align:middle; }
+#meow-panel .meow-tool-preview > button { margin:8px 0; }

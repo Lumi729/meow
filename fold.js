@@ -32,6 +32,8 @@ export function foldHints(root){
   let prev=label||small.previousElementSibling;
   while(prev&&prev.classList.contains('meow-hint-text'))prev=prev.previousElementSibling;
   if(label)label.after(small);
+  // A block (list, button group, picker) or a heading: hang the dot on the section title instead of a line of its own.
+  if(!label&&(!prev||/^H[1-6]$/.test(prev.tagName)||(prev.tagName==='DIV'&&!prev.classList.contains('meow-hint-row')))){let h=prev;while(h&&!/^H[1-6]$/.test(h.tagName))h=h.previousElementSibling;if(h){h.append(dot);continue;}}
   if(prev?.tagName==='SUMMARY')prev.append(dot);
   else if(prev?.classList.contains('meow-hint-row'))prev.append(dot);
   else if(prev?.matches('details')&&prev.querySelector(':scope > summary')&&prev.parentElement===small.parentElement)prev.querySelector(':scope > summary').append(dot);
