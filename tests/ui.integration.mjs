@@ -149,7 +149,7 @@ click('theme-reset');await settle();assert.equal(document.getElementById('meow-t
 current='chat-a';await events.chat();
 const chatBox=document.createElement('div');chatBox.id='chat';chatBox.innerHTML='<div class="mes" mesid="0"><div class="mes_text"><p>white cat</p></div></div>';document.body.append(chatBox);
 const fbar=document.createElement('div');fbar.id='be-float-bar';fbar.className='show';fbar.innerHTML='<button class="be-fbtn" data-act="highlight">划线</button>';document.body.append(fbar);await settle();const other=document.createElement('button');other.className='be-fbtn other-edit';other.textContent='修改';fbar.append(other);await new Promise(r=>setTimeout(r,400));
-const meowBtn=fbar.querySelector('.meow-be-btn');assert.ok(meowBtn);assert.ok(fbar.querySelector('.other-edit'));assert.equal(fbar.lastElementChild,meowBtn);assert.match(meowBtn.textContent,/画图/);
+const meowBtn=document.getElementById('meow-be-draw');assert.ok(meowBtn);assert.ok(!meowBtn.hidden);assert.ok(fbar.querySelector('.other-edit'));assert.equal(fbar.querySelector('#meow-be-draw'),null);assert.match(meowBtn.textContent,/画图/);
 const range=document.createRange();range.selectNodeContents(chatBox.querySelector('p').firstChild);window.getSelection().removeAllRanges();window.getSelection().addRange(range);
 let selBodies=[];globalThis.fetch=async(url,options)=>{const b=JSON.parse(options.body);selBodies.push({url:String(url),b});if(String(url).includes('chat-completions'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'a white cat',source_ids:['m0sel'],anchor_source_id:'m0sel',anchor_quote:'white cat'}]})}}]}));return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
 meowBtn.click();await settle();const selDialog=document.getElementById('meow-selection-dialog');assert.ok(selDialog.open);assert.match(selDialog.textContent,/white cat/);assert.ok(!selDialog.querySelector('option[value=chat]').disabled);
@@ -159,5 +159,14 @@ const selEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list())
 // Gift for 梨梨: welcome card once, letter after five taps on the title.
 assert.ok(document.getElementById('meow-gift-welcome').textContent.includes('世界为梨梨诞生'));document.getElementById('meow-gift-welcome').close();assert.equal(extensionSettings.meow_gift_seen,true);
 const giftTitle=document.querySelector('#meow-panel .meow-header h2');for(let i=0;i<5;i++)giftTitle.click();assert.ok(document.getElementById('meow-gift-letter').open);assert.match(document.getElementById('meow-gift-letter').textContent,/梨梨/);
+// Redraws of story pictures follow the current 星绘 config (fixed positive changed after drawing).
+document.querySelectorAll('dialog').forEach(d=>{if(d.open)d.close();});
+let redrawBody;globalThis.fetch=async(url,options)=>{redrawBody=JSON.parse(options.body);return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
+const withScene=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.scene);assert.ok(withScene);
+click('close');click('floating');document.querySelector('[data-page="draw"]').click();field('fixed_positive','ink style');
+document.querySelector('[data-page="gallery"]').click();$('gallery-filter').value='all';$('gallery-filter').dispatchEvent(new Event('change'));await settle();
+[...$('gallery').querySelectorAll('button')].find(b=>b.querySelector('img')?.alt===withScene.title&&b.querySelector('img').src===withScene.src)?.click()??$('gallery').querySelector('button').click();await settle();
+[...$('viewer').querySelectorAll('button')].find(b=>b.textContent.startsWith('重绘')).click();await settle();
+const sentPrompt=redrawBody.input??redrawBody.prompt;assert.ok(sentPrompt.startsWith('ink style'),sentPrompt);assert.ok(sentPrompt.includes(withScene.scene.prompt),sentPrompt);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');process.exit(0);
 await window.happyDOM.abort();

@@ -72,7 +72,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
   const source=sources?.[0];if(!source)throw new Error('这张图没有绑定原文。');
   const key=chatKey(),message=context().chat[source.messageIndex];if(!message)throw new Error('来源消息已删除。');anchorEnd(message,source);
   const path=await upload(entry);if(key!==chatKey()||context().chat[source.messageIndex]!==message)throw new Error('上传时切换了聊天，未插入其他正文。');
-  const group=attachVariant(message,source,{id:entry.id,path,payload:structuredClone(entry.payload),title:entry.title});await persist();report(mounted.get(group.id)?.isConnected?'图片已插在标签内对应句子后，标签与折叠状态保持不变。':'图片和句子位置已保存；目标句暂未显示，显示后会插入原位，不移到楼层外。');return path;
+  const group=attachVariant(message,source,{id:entry.id,path,payload:structuredClone(entry.payload),title:entry.title,...(entry.scene?{scene:structuredClone(entry.scene)}:{})});await persist();report(mounted.get(group.id)?.isConnected?'图片已插在标签内对应句子后，标签与折叠状态保持不变。':'图片和句子位置已保存；目标句暂未显示，显示后会插入原位，不移到楼层外。');return path;
  }
  function decorate(){
   for(const [id,card] of mounted){const message=context().chat[Number(card.dataset.message)],g=message?.extra?.meow_inline?.find(x=>x.id===id);if(!card.isConnected||card.dataset.chat!==chatKey()||!g||!active(message,g)){card.remove();mounted.delete(id);}}

@@ -45,7 +45,7 @@ export function mountCamera({root,context,chatKey,panel,page,secondary,run,isBus
    const item=batch[i],record=s.records.find(r=>r.id===item.source_ids[0]);
    const payload=prepare({...base,prompt:combine(item.prompt,'security camera perspective, wide angle, non-explicit scene'),extra_negative:combine(base.extra_negative,item.negative_prompt,'nudity, explicit sexual content')});
    const src=await png(payload,signal),entry=makeEntry(src,payload,[{id:record.id,messageIndex:s.index,name:context().chat[s.index]?.name||'野火视窗',part:record.title,text:record.text}],record.title,s.key);
-   entry.cameraKey=cameraIdentity(s);await addImage(entry);valid(s);publish(s);
+   entry.cameraKey=cameraIdentity(s);entry.scene={prompt:combine(item.prompt,'security camera perspective, wide angle, non-explicit scene'),negative_prompt:combine(item.negative_prompt,'nudity, explicit sexual content'),characters:null};await addImage(entry);valid(s);publish(s);
   }
   state.textContent='画面已返回野火监控屏，也已保存到图库。点击下方返回查看。';
  }));
