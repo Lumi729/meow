@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Window} from 'happy-dom';
-import {mountInline} from '../inline.js';
+import {mountInline,placeAfterQuote} from '../inline.js';
 test('one image for multiple sources, local redraw, preserved code/iframe and deletable variants',async()=>{
  const window=new Window({url:'https://local.test'});globalThis.document=window.document;globalThis.MutationObserver=window.MutationObserver;globalThis.confirm=()=>true;
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};
@@ -20,4 +20,16 @@ test('one image for multiple sources, local redraw, preserved code/iframe and de
  [...viewer.querySelectorAll('button')].find(b=>b.textContent==='重绘').click();await settle();assert.match(document.querySelector('.meow-inline-card [role=status]').textContent,/正在/);release();await settle();assert.ok(document.querySelector('.meow-inline-photo').src.endsWith('/c.png'));
  [...viewer.querySelectorAll('button')].find(b=>b.textContent==='删除正文中的此图').click();await settle();assert.ok(!document.querySelector('.meow-inline-photo').src.endsWith('/c.png'));assert.equal(chat[0].mes,'1xxxx2');assert.equal(body.querySelector('iframe'),frame);assert.ok(saves>=5);
  await window.happyDOM.abort();
+});
+
+test('sentence pictures stay within paired content and closed details without restructuring or opening',async()=>{
+ const w=new Window();const d=w.document;d.body.innerHTML='<div class="mes_text"><content>前文。<details><summary>折叠</summary><p>第一句。<em>第二句。</em>尾句。</p></details>末尾。</content></div>';
+ const content=d.querySelector('content'),fold=d.querySelector('details'),em=d.querySelector('em'),p=d.querySelector('p');
+ const card=d.createElement('span');card.className='meow-inline-card';card.textContent='image';
+ assert.ok(placeAfterQuote(d.querySelector('.mes_text'),'第二句。',card));assert.equal(card.closest('content'),content);assert.equal(card.closest('details'),fold);assert.equal(card.parentElement,em);assert.equal(fold.open,false);assert.equal(p.textContent,'第一句。第二句。image尾句。');
+ const bad=d.createElement('span');assert.equal(placeAfterQuote(d.querySelector('.mes_text'),'不存在',bad),false);assert.equal(bad.isConnected,false);await w.happyDOM.abort();
+});
+test('repeated sentence uses the captured occurrence instead of moving outside the text',async()=>{
+ const w=new Window();w.document.body.innerHTML='<content><p>你好。开始。</p><p>你好。结束。</p></content>';const card=w.document.createElement('span');card.className='meow-inline-card';const snapshot='<content>你好。开始。你好。结束。</content>';
+ assert.ok(placeAfterQuote(w.document.body,'你好。',card,{snapshot,anchorStart:snapshot.lastIndexOf('你好。')}));assert.equal(card.parentElement,w.document.querySelectorAll('p')[1]);await w.happyDOM.abort();
 });

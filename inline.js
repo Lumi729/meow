@@ -34,11 +34,22 @@ export function removeVariant(message,group){
 }
 export function bindSwipe(element,move){let touch;element.addEventListener('touchstart',e=>{touch=e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null;},{passive:true});element.addEventListener('touchend',e=>{if(!touch||!e.changedTouches.length)return;const dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;touch=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)){element.dataset.meowSwiped='1';Promise.resolve(move(dx<0?1:-1)).catch(()=>{});setTimeout(()=>delete element.dataset.meowSwiped,350);}},{passive:true});}
 // Anchor in rendered text only. Never insert into a code block, HTML source or script.
-export function placeAfterQuote(body,quote,card){
+function normalizedText(text){
+ let value='',positions=[];for(let i=0;i<text.length;i++){const c=/\s/.test(text[i])?' ':text[i];if(c===' '&&value.endsWith(' ')){positions[positions.length-1]=i+1;continue;}value+=c;positions.push(i+1);}return {value,positions};
+}
+export function placeAfterQuote(body,quote,card,source={}){
  const doc=body.ownerDocument,walk=doc.createTreeWalker(body,4),nodes=[];let all='',n;
  while((n=walk.nextNode())){if(n.parentElement?.closest('script,style,pre,code,textarea,button,.meow-inline-card,[hidden]'))continue;nodes.push({n,start:all.length});all+=n.textContent;}
- const pos=all.indexOf(quote);if(pos<0||all.indexOf(quote,pos+1)>=0)return false;
- const end=pos+quote.length,hit=nodes.find(x=>end>x.start&&end<=x.start+x.n.length);if(!hit)return false;
+ const normalized=normalizedText(all),target=normalizedText(quote).value;if(!target)return false;
+ const matches=[];for(let at=normalized.value.indexOf(target);at>=0;at=normalized.value.indexOf(target,at+target.length))matches.push(at);
+ if(!matches.length)return false;let occurrence=0;
+ if(matches.length>1){
+  // Resolve duplicate sentences only when the raw and rendered occurrence counts agree.
+  const raw=source.snapshot??source.messageSnapshot;if(typeof raw!=='string'||!Number.isInteger(source.anchorStart))return false;
+  const occurrences=[];for(let at=raw.indexOf(quote);at>=0;at=raw.indexOf(quote,at+quote.length))occurrences.push(at);
+  occurrence=occurrences.indexOf(source.anchorStart);if(occurrences.length!==matches.length||occurrence<0)return false;
+ }
+ const end=normalized.positions[matches[occurrence]+target.length-1],hit=nodes.find(x=>end>x.start&&end<=x.start+x.n.length);if(!hit)return false;
  const range=doc.createRange();range.setStart(hit.n,end-hit.start);range.collapse(true);range.insertNode(card);return true;
 }
 export function mountInline({context,chatKey,upload,generate,redraw,report}){
@@ -61,7 +72,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
   const source=sources?.[0];if(!source)throw new Error('这张图没有绑定原文。');
   const key=chatKey(),message=context().chat[source.messageIndex];if(!message)throw new Error('来源消息已删除。');anchorEnd(message,source);
   const path=await upload(entry);if(key!==chatKey()||context().chat[source.messageIndex]!==message)throw new Error('上传时切换了聊天，未插入其他正文。');
-  attachVariant(message,source,{id:entry.id,path,payload:structuredClone(entry.payload),title:entry.title});await persist();report('图片已挂到对应句子；原文和美化代码保持不变。');return path;
+  const group=attachVariant(message,source,{id:entry.id,path,payload:structuredClone(entry.payload),title:entry.title});await persist();report(mounted.get(group.id)?.isConnected?'图片已插在标签内对应句子后，标签与折叠状态保持不变。':'图片和句子位置已保存；目标句暂未显示，显示后会插入原位，不移到楼层外。');return path;
  }
  function decorate(){
   for(const [id,card] of mounted){const message=context().chat[Number(card.dataset.message)],g=message?.extra?.meow_inline?.find(x=>x.id===id);if(!card.isConnected||card.dataset.chat!==chatKey()||!g||!active(message,g)){card.remove();mounted.delete(id);}}
@@ -73,12 +84,11 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
     if(!card){const target={key:chatKey(),index,id:group.id};card=document.createElement('span');card.className='meow-inline-card';card.dataset.message=index;card.dataset.chat=chatKey();card.dataset.group=group.id;
      const photo=document.createElement('img');photo.className='meow-inline-photo';photo.alt='正文插图';photo.addEventListener('click',()=>{if(!photo.dataset.meowSwiped)open(target);});bindSwipe(photo,delta=>change(target,delta));
      const row=document.createElement('span');row.className='meow-inline-actions';const redrawButton=button('重绘',()=>redrawVariant(target));redrawButton.dataset.redraw='1';row.append(button('放大 / 管理',()=>open(target)),redrawButton,button('删除',()=>remove(target)),button('‹',()=>change(target,-1)),button('›',()=>change(target,1)));const note=document.createElement('span');note.setAttribute('role','status');card.append(photo,row,note);
-     let placed=placeAfterQuote(body,group.anchorText,card);
-     if(!placed){for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card)){card.style.cssText='display:block;color:#51434a;background:#fff7fa;padding:8px;';photo.style.cssText='max-width:100%;max-height:65vh;object-fit:contain;display:block;';placed=true;break;}}catch{}}}
-     if(!placed){card.dataset.fallback='1';const source=document.createElement('small');source.textContent=`对应原文：${group.anchorText}`;source.style.display='block';card.prepend(source);body.after(card);}
+     let placed=placeAfterQuote(body,group.anchorText,card,group);
+     if(!placed){for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card,group)){card.style.cssText='display:block;color:#51434a;background:#fff7fa;padding:8px;';photo.style.cssText='max-width:100%;max-height:65vh;object-fit:contain;display:block;';placed=true;break;}}catch{}}}
+     if(!placed)continue;
      mounted.set(group.id,card);
     }
-    if(card.dataset.fallback==='1'){let moved=placeAfterQuote(body,group.anchorText,card);if(!moved)for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card)){card.style.cssText='display:block;color:#51434a;background:#fff7fa;padding:8px;';card.querySelector('img').style.cssText='max-width:100%;max-height:65vh;object-fit:contain;display:block;';moved=true;break;}}catch{}}if(moved){delete card.dataset.fallback;card.querySelector('small')?.remove();}}
     const photo=card.querySelector('img');if(photo.getAttribute('src')!==variant.path)photo.src=variant.path;
     const busy=redrawing.has(group.id),b=card.querySelector('[data-redraw]');b.disabled=busy;const label=busy?'正在重绘…':'重绘';if(b.textContent!==label)b.textContent=label;const note=card.querySelector('[role=status]'),text=busy?'正在生成新版本，请稍候…':`${group.active+1} / ${group.variants.length}`;if(note.textContent!==text)note.textContent=text;
    }

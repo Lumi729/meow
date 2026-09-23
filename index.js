@@ -1,6 +1,6 @@
 import { mountCamera } from './camera.js';
 import { tokenVault } from './credentials.js';
-import { scanAppearance } from './appearance.js';
+import { scanAppearance, appearanceScope, mergeAppearanceScan, formatAppearanceProfiles } from './appearance.js';
 import { mountInline, migrateLegacy, bindSwipe } from './inline.js';
 import { saveSettings } from '../../../../script.js';
 import { updateSelf } from './updater.js';
@@ -97,16 +97,25 @@ export async function init(){
  const launcherValues=()=>{launcherFields.forEach(([id,k,t])=>{if(t==='check')el(id).checked=ui[k]!==false;else el(id).value=ui[k]??'';});el('size-output').textContent=`${ui.normal_size||64}px`;el('bad-size-output').textContent=`${ui.bad_size||64}px`;};launcherValues();
  launcherFields.forEach(([id,k,t])=>on(id,()=>{if(t==='text'&&el(id).value.trim()&&!el(id).value.startsWith('https://'))throw new Error('图片链接需以 https:// 开头。');ui[k]=t==='check'?el(id).checked:t==='number'?Number(el(id).value):el(id).value.trim();save();panel.refresh();launcherValues();},t==='text'?'change':'input'));
  on('launcher-reset',()=>{panel.reset();launcherValues();status('已恢复小动物手机和爱字图片，悬浮按钮回到右侧。');});
- ext.meow_appearance??={};
- const appearanceKey=()=>chatKey();
- const appearanceState=()=>ext.meow_appearance[appearanceKey()];
- const showAppearance=()=>{el('appearance-text').value=appearanceState()?.text||'';el('appearance-state').textContent=appearanceState()?.summary||'未扫描；生成 tags 前会自动扫描当前角色与关联世界书。';};
- const refreshAppearance=async()=>{const key=appearanceKey();let settings={};try{const module=await import('../../../world-info.js');settings=module.getWorldInfoSettings();}catch{}const result=await scanAppearance(ctx(),settings);if(key!==appearanceKey())throw new Error('扫描时切换了聊天，请重新扫描。');ext.meow_appearance[key]=result;save();showAppearance();return result.text;};
- const getAppearance=async()=>{if(!el('appearance-enabled').checked)return '';const text=appearanceState()?.text??await refreshAppearance();if(text.length>80000)throw new Error('人物资料超过 8 万字，请在资料框删减后再发送。');return text;};
+ ext.meow_people??={};ext.meow_cast_profiles??={};
+ const archive=ext.meow_people;
+ const appearanceKey=()=>appearanceScope(ctx());
+ const castProfiles=()=>ext.meow_cast_profiles[appearanceKey()]??={ids:[],scanned:false};
+ let editingProfile='',profileDrafts=new Map();
+ const rememberDraft=()=>{if(editingProfile)profileDrafts.set(editingProfile,{name:el('appearance-name').value,text:el('appearance-text').value});};
+ const loadProfile=id=>{editingProfile=id;const draft=profileDrafts.get(id),p=archive[id];el('appearance-name').value=draft?.name??p?.name??'';el('appearance-text').value=draft?.text??p?.text??'';el('appearance-use').checked=castProfiles().ids.includes(id);el('appearance-use').disabled=!p;el('appearance-source').textContent=p?.source||'填写姓名与外貌后，点击保存人物档案。';};
+ const showAppearance=()=>{const state=castProfiles(),legacy=ext.meow_appearance?.[chatKey()];if(!state.scanned&&!state.ids.length&&legacy?.text){const id=`legacy:${appearanceKey()}`;archive[id]??={id,name:'旧版合并资料（可拆分）',text:legacy.text,source:'从旧版已保存资料迁移'};state.ids=[id];state.scanned=true;state.summary='旧版修改已保留。可以扫描并拆分为各个人物档案。';save();}const list=el('appearance-profile'),ids=Object.keys(archive),preferred=castProfiles().ids.find(id=>archive[id]);list.replaceChildren(new Option('＋ 新建人物档案',''),...ids.map(id=>new Option(`${castProfiles().ids.includes(id)?'✓ ':''}${archive[id].name}`,id)));const id=archive[editingProfile]?editingProfile:preferred||'';list.value=id;loadProfile(id);el('appearance-state').textContent=castProfiles().summary||'首次生成 tags 前会扫描；已保存档案跨聊天复用，不自动覆盖你的修改。';el('appearance-preview').value=formatAppearanceProfiles(archive,castProfiles().ids);};
+ const refreshAppearance=async()=>{rememberDraft();const key=appearanceKey();let settings={};try{const module=await import('../../../world-info.js');settings=module.getWorldInfoSettings();}catch{}const result=await scanAppearance(ctx(),settings);if(key!==appearanceKey())throw new Error('扫描时切换了人物，请重新扫描。');const state=castProfiles(),known=new Set(Object.keys(archive)),ids=mergeAppearanceScan(archive,result.records);for(const id of ids)if(!known.has(id)||!state.scanned)if(!state.ids.includes(id))state.ids.push(id);state.scanned=true;state.summary=result.summary+' 已有档案保持不变；可选择档案检查、修改并保存。';save();showAppearance();return formatAppearanceProfiles(archive,state.ids);};
+ const getAppearance=async()=>{if(!el('appearance-enabled').checked)return '';rememberDraft();if([...profileDrafts].some(([id,d])=>castProfiles().ids.includes(id)&&(d.text!==archive[id]?.text||d.name!==archive[id]?.name)))throw new Error('人物档案有未保存修改，请先点“保存人物档案”。');if(!castProfiles().scanned)await refreshAppearance();const text=formatAppearanceProfiles(archive,castProfiles().ids);if(text.length>80000)throw new Error('人物资料超过 8 万字，请减少勾选档案或删减内容。');return text;};
  el('appearance-enabled').checked=secondary.appearance_enabled!==false;showAppearance();
  on('appearance-enabled',()=>{secondary.appearance_enabled=el('appearance-enabled').checked;save();},'change');
  on('appearance-scan',()=>run(refreshAppearance));
- on('appearance-text',()=>{ext.meow_appearance[appearanceKey()]={text:el('appearance-text').value,summary:'已使用你编辑的人物资料；点击重新扫描可恢复提取结果。'};save();},'input');
+ on('appearance-profile',()=>{rememberDraft();loadProfile(el('appearance-profile').value);},'change');
+ on('appearance-save',()=>{const name=el('appearance-name').value.trim(),text=el('appearance-text').value.trim();if(!name||!text)throw new Error('请填写人物姓名与外貌资料。');const id=editingProfile||`manual:${crypto.randomUUID()}`;archive[id]={...archive[id],id,name,text,updated:Date.now()};if(!editingProfile||el('appearance-use').checked){if(!castProfiles().ids.includes(id))castProfiles().ids.push(id);}editingProfile=id;profileDrafts.delete(id);save();showAppearance();status('人物档案已保存；同一人物在新聊天中可直接复用。');});
+ on('appearance-use',()=>{const state=castProfiles();state.ids=el('appearance-use').checked?[...new Set([...state.ids,editingProfile])]:state.ids.filter(id=>id!==editingProfile);save();el('appearance-preview').value=formatAppearanceProfiles(archive,state.ids);},'change');
+ on('appearance-new',()=>{rememberDraft();el('appearance-profile').value='';loadProfile('');});
+ on('appearance-latest',()=>{const p=archive[editingProfile];if(!p?.scannedText)throw new Error('此档案没有扫描候选，请先重新扫描。');el('appearance-text').value=p.scannedText;status('已载入扫描候选，检查后点“保存人物档案”才会覆盖。');});
+ on('appearance-delete',()=>{const id=editingProfile;if(!archive[id])return;if(!confirm('删除此人物档案？其他聊天也不再使用它。'))return;delete archive[id];profileDrafts.delete(id);for(const state of Object.values(ext.meow_cast_profiles))state.ids=state.ids.filter(x=>x!==id);editingProfile='';save();showAppearance();});
  const setBusy=value=>{busy=value;for(const id of ['generate','tags','bad-generate','capture','save-token','save-secondary','update-self'])el(id).disabled=value;el('stop').hidden=!value;el('tags').textContent=value?'正在处理，请稍候…':'② 只发送勾选内容，生成 tags';root.setAttribute('aria-busy',String(value));};
  const run=async fn=>{if(busy)throw new Error('猫猫正在忙，请等待当前任务完成。');stopping=false;controller=new AbortController();setBusy(true);try{await fn(controller.signal);}finally{setBusy(false);controller=null;}};
  on('repair-inline',()=>run(async()=>{let changed=false;for(const message of ctx().chat)changed=migrateLegacy(message)||changed;if(changed){await ctx().saveChat();window.location.reload();}else status('当前聊天没有旧版插图标记，无需修复。');}));
@@ -184,7 +193,7 @@ export async function init(){
 
  const characters=validateCharacters(s.characters),payload=buildRequest(cfg);const extra=JSON.parse(advanced.parameters||'{}');if(!extra||typeof extra!=='object'||Array.isArray(extra))throw new Error('高级 parameters 必须是对象。');payload.direct=directRequest(payload,JSON.stringify({...extra,...characterParameters(characters,advanced.model||payload.model)}),advanced.model);return payload;});for(let i=0;i<batch.length;i++){if(stopping)break;checkChat();status(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);const src=await png(payloads[i],signal);const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;await addImage(entry);if(output==='chat'){if(key!==chatKey()){status('聊天已切换，图片已存入图文相册，未插入其他聊天。');break;}await insert(entry);}if(entry.unsaved)break;}status(stopping?'已停止后续图片。':'本轮完成，在图库筛选“坏猫猫图文”可查看原文和图片。');}));
  mountCamera({root,context:ctx,chatKey,panel,page,secondary,run,isBusy:()=>busy,config,prepare,png,makeEntry,addImage,listImages:()=>images,getAppearance,stop:()=>{stopping=true;controller?.abort();}});
- ctx().eventSource.on(ctx().event_types.CHAT_CHANGED,()=>{showAppearance();renderPreviews();capture=null;parts=[];scenes=[];el('context-list').replaceChildren();el('scenes').replaceChildren();el('send-preview').value='';renderGallery();});
+ ctx().eventSource.on(ctx().event_types.CHAT_CHANGED,()=>{rememberDraft();editingProfile='';showAppearance();renderPreviews();capture=null;parts=[];scenes=[];el('context-list').replaceChildren();el('scenes').replaceChildren();el('send-preview').value='';renderGallery();});
  try{images=await store.list();renderGallery();renderPreviews();}catch{status('当前浏览器无法打开图库存储，生成后请及时下载。');}
 }
 ctx().eventSource.on(ctx().event_types.APP_READY,()=>init().catch(error=>{console.error('Meow initialization failed:',error);const target=document.querySelector('#meow-status')||document.querySelector('#extensions_settings2');if(target){const message=document.createElement('p');message.textContent='猫猫星绘初始化失败，请更新扩展并刷新；若仍失败，请提供浏览器控制台错误。';target.append(message);}}));

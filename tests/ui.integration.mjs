@@ -103,5 +103,11 @@ $('latest').querySelector('.meow-thumb').click();await settle();
 const chosenPreview=extensionSettings.meow_preview.draw;$('viewer').close();
 assert.equal(extensionSettings.meow_preview.draw,chosenPreview);assert.ok($('latest').textContent.includes('2 /'));
 $('latest').querySelector('.meow-row button').click();await settle();assert.ok($('latest').textContent.includes('1 /'));
+// Saved appearance profiles survive chat changes and require explicit save of edits.
+click('appearance-new');field('appearance-name','陈野');field('appearance-text','银发，蓝眼');click('appearance-save');await settle();
+const personId=$('appearance-profile').value;assert.ok(personId);assert.match($('appearance-preview').value,/银发/);
+current='another-chat-same-character';await events.chat();assert.equal($('appearance-profile').value,personId);assert.equal($('appearance-text').value,'银发，蓝眼');
+field('appearance-text','银发，绿眼');click('appearance-save');await settle();assert.equal(extensionSettings.meow_people[personId].text,'银发，绿眼');
+$('appearance-use').checked=false;$('appearance-use').dispatchEvent(new Event('change'));await settle();assert.ok(!$('appearance-preview').value.includes('银发'));
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();

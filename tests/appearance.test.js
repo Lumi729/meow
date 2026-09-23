@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {scanAppearance} from '../appearance.js';
+import {scanAppearance,appearanceScope,mergeAppearanceScan,formatAppearanceProfiles} from '../appearance.js';
 import {buildTagRequest,captureContext,parseScenes,sceneAnchor,splitAutoMessage} from '../context.js';
 import {tokenVault} from '../credentials.js';
 import {indexedDB} from 'fake-indexeddb';
@@ -21,4 +21,15 @@ test('N scenes across passages use their own exact sentence, not every reference
 });
 test('local direct token survives a new vault instance but stays isolated by profile',async()=>{
  globalThis.indexedDB=indexedDB;await tokenVault('one').set('fake-local-token');assert.equal(await tokenVault('one').get(),'fake-local-token');assert.equal(await tokenVault('two').get(),'');await tokenVault('one').clear();assert.equal(await tokenVault('one').get(),'');
+});
+
+test('person archives reuse stable identity across chats and rescan never replaces saved edits',()=>{
+ const c={characterId:0,characters:[{avatar:'chen.png',name:'陈野'}],name1:'黎千',getCurrentChatId:()=> 'first'};
+ assert.equal(appearanceScope(c),appearanceScope({...c,getCurrentChatId:()=> 'second'}));
+ assert.notEqual(appearanceScope(c),appearanceScope({...c,characters:[{avatar:'different.png',name:'陈野'}]}));
+ const archive={};mergeAppearanceScan(archive,[{id:'card:chen.png',name:'陈野',text:'旧描述',source:'角色卡'}]);
+ archive['card:chen.png'].text='我修改后的银发';
+ mergeAppearanceScan(archive,[{id:'card:chen.png',name:'陈野',text:'新扫描黑发',source:'角色卡'}]);
+ const restored=JSON.parse(JSON.stringify(archive));assert.equal(restored['card:chen.png'].text,'我修改后的银发');assert.equal(restored['card:chen.png'].scannedText,'新扫描黑发');
+ assert.match(formatAppearanceProfiles(restored,['card:chen.png']),/我修改后的银发/);assert.equal(formatAppearanceProfiles(restored,[]),'');
 });
