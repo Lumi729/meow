@@ -193,10 +193,3 @@ dialog.meow-gift > * { position:relative; }
 #chat .meow-inline-card .meow-inline-photo { margin-left:auto !important; margin-right:auto !important; }
 .meow-inline-card .meow-inline-actions { justify-content:center; }
 .meow-inline-card > [role=status] { text-align:center; }
-#meow-be-draw { position:absolute; z-index:2147483000; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:52px; padding:7px 10px; border:0; border-radius:14px; background:#3a3a3c; color:#fff; font-size:12px; line-height:1.2; box-shadow:0 4px 16px #0003; cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none; }
-#meow-be-draw[hidden] { display:none !important; }
-#meow-be-draw svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; }
-#meow-be-draw { flex-direction:row; align-items:stretch; padding:0 4px 0 0; min-width:0; }
-#meow-be-draw .meow-be-sep { align-self:center; flex:none; width:1px; height:60%; background:currentColor; opacity:.25; }
-#meow-be-draw .meow-be-inner { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:6px 10px; }
-#meow-be-draw.meow-be-joined { box-shadow:none; }
