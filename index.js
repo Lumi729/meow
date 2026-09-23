@@ -11,6 +11,7 @@ import { mountPanel } from './panel.js';
 import { galleryStore } from './storage.js';
 import { DEFAULT_RULES, TAG_PRESET, captureContext, parseTagPreset, parseScenes, apiBase, buildTagRequest, sceneAnchor } from './context.js';
 import { SECRET_KEYS, secret_state, writeSecret, findSecret } from '../../../secrets.js';
+import * as secretsModule from '../../../secrets.js';
 import { saveBase64AsFile } from '../../../utils.js';
 const ctx=()=>SillyTavern.getContext();
 const folder=new URL('.',import.meta.url).pathname.split('/').filter(Boolean).slice(-2).join('/');
@@ -87,7 +88,9 @@ export async function init(){
   }catch(error){el('models-state').textContent=error.name==='AbortError'?'拉取超时，请重试或手动填写模型。':error.message;}
   finally{clearTimeout(timer);modelsLoading=false;el('fetch-models').disabled=false;}
  });
- on('save-secondary',async()=>{if(busy)throw new Error('请等待当前任务完成。');apiBase(secondary.url);const value=el('secondary-key').value.trim();if(!value)throw new Error('请填写副 API 密钥。');el('save-secondary').disabled=true;try{const id=await writeSecret(SECRET_KEYS.CUSTOM,value,'Meow secondary');if(!id)throw new Error('副 API 密钥保存失败。');secondary.secret_id=id;save();keyStatus();status('副 API 密钥已保存。');}finally{el('secondary-key').value='';el('save-secondary').disabled=false;}});
+ const activeCustomId=()=>{const list=secret_state[SECRET_KEYS.CUSTOM];return Array.isArray(list)?(list.find(x=>x?.active)?.id||''):'';};
+ const restoreCustom=async id=>{if(typeof secretsModule.rotateSecret==='function'){await secretsModule.rotateSecret(SECRET_KEYS.CUSTOM,id);return activeCustomId()?activeCustomId()===id:true;}const r=await fetch('/api/secrets/rotate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify({key:SECRET_KEYS.CUSTOM,id})});return r.ok;};
+ on('save-secondary',async()=>{if(busy)throw new Error('请等待当前任务完成。');apiBase(secondary.url);const value=el('secondary-key').value.trim();if(!value)throw new Error('请填写副 API 密钥。');el('save-secondary').disabled=true;try{const previous=activeCustomId();const id=await writeSecret(SECRET_KEYS.CUSTOM,value,'Meow secondary');if(!id)throw new Error('副 API 密钥保存失败。');secondary.secret_id=id;save();let kept=true;if(previous&&previous!==id){try{kept=await restoreCustom(previous);}catch{kept=false;}}keyStatus();status(kept?'副 API 密钥已单独保存，酒馆主 API 密钥保持不变。':'副 API 密钥已保存，但没能切回酒馆原来的主密钥：请在酒馆「API 连接配置」点钥匙图标，手动选回原来的密钥。');}finally{el('secondary-key').value='';el('save-secondary').disabled=false;}});
  on('tag-import',async()=>{const f=el('tag-import').files[0];if(!f)return;if(f.size>200000)throw new Error('预设文件太大。');secondary.preset=parseTagPreset(await f.text(),f.name);if(!secondary.preset.trim())throw new Error('预设没有可用文本。');el('tag-preset').value=secondary.preset;save();el('tag-import').value='';status('tags 预设已导入，可继续编辑。');},'change');
  on('tag-export',()=>download('meow-tags-preset.json',JSON.stringify({system_prompt:secondary.preset},null,2)));
  for(const [id,k] of [['transport','transport'],['direct-model','model'],['direct-params','parameters']]){el(id).value=advanced[k];on(id,()=>{advanced[k]=el(id).value;save();},'input');}
