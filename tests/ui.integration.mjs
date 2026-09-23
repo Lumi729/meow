@@ -148,8 +148,8 @@ click('theme-reset');await settle();assert.equal(document.getElementById('meow-t
 // 书摘 bridge: a "画图" button joins the selection bar; the selected sentence goes to tags and then to a picture.
 current='chat-a';await events.chat();
 const chatBox=document.createElement('div');chatBox.id='chat';chatBox.innerHTML='<div class="mes" mesid="0"><div class="mes_text"><p>white cat</p></div></div>';document.body.append(chatBox);
-const fbar=document.createElement('div');fbar.id='be-float-bar';fbar.className='show';fbar.innerHTML='<button class="be-fbtn" data-act="highlight">划线</button>';document.body.append(fbar);await settle();
-const meowBtn=fbar.querySelector('.meow-be-btn');assert.ok(meowBtn);assert.match(meowBtn.textContent,/画图/);
+const fbar=document.createElement('div');fbar.id='be-float-bar';fbar.className='show';fbar.innerHTML='<button class="be-fbtn" data-act="highlight">划线</button>';document.body.append(fbar);await settle();const other=document.createElement('button');other.className='be-fbtn other-edit';other.textContent='修改';fbar.append(other);await new Promise(r=>setTimeout(r,400));
+const meowBtn=fbar.querySelector('.meow-be-btn');assert.ok(meowBtn);assert.ok(fbar.querySelector('.other-edit'));assert.equal(fbar.lastElementChild,meowBtn);assert.match(meowBtn.textContent,/画图/);
 const range=document.createRange();range.selectNodeContents(chatBox.querySelector('p').firstChild);window.getSelection().removeAllRanges();window.getSelection().addRange(range);
 let selBodies=[];globalThis.fetch=async(url,options)=>{const b=JSON.parse(options.body);selBodies.push({url:String(url),b});if(String(url).includes('chat-completions'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'a white cat',source_ids:['m0sel'],anchor_source_id:'m0sel',anchor_quote:'white cat'}]})}}]}));return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
 meowBtn.click();await settle();const selDialog=document.getElementById('meow-selection-dialog');assert.ok(selDialog.open);assert.match(selDialog.textContent,/white cat/);assert.ok(!selDialog.querySelector('option[value=chat]').disabled);
