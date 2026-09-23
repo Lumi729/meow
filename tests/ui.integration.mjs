@@ -156,5 +156,8 @@ meowBtn.click();await settle();const selDialog=document.getElementById('meow-sel
 [...selDialog.querySelectorAll('button')].find(b=>b.textContent.startsWith('开始')).click();await settle();await settle();
 assert.ok(selBodies.some(x=>x.url.includes('chat-completions')&&JSON.stringify(x.b).includes('white cat')));assert.ok(!fbar.classList.contains('show'));
 const selEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.source[0]?.id==='m0sel');assert.ok(selEntry);assert.equal(selEntry.insertionSource.anchorText,'white cat');
+// Gift for 梨梨: welcome card once, letter after five taps on the title.
+assert.ok(document.getElementById('meow-gift-welcome').textContent.includes('世界为梨梨诞生'));document.getElementById('meow-gift-welcome').close();assert.equal(extensionSettings.meow_gift_seen,true);
+const giftTitle=document.querySelector('#meow-panel .meow-header h2');for(let i=0;i<5;i++)giftTitle.click();assert.ok(document.getElementById('meow-gift-letter').open);assert.match(document.getElementById('meow-gift-letter').textContent,/梨梨/);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');process.exit(0);
 await window.happyDOM.abort();

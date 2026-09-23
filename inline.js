@@ -85,7 +85,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
      const photo=document.createElement('img');photo.className='meow-inline-photo';photo.alt='正文插图';photo.addEventListener('click',()=>{if(!photo.dataset.meowSwiped)open(target);});bindSwipe(photo,delta=>change(target,delta));
      const row=document.createElement('span');row.className='meow-inline-actions';const redrawButton=button('重绘',()=>redrawVariant(target));redrawButton.dataset.redraw='1';row.append(button('放大 / 管理',()=>open(target)),redrawButton,button('删除',()=>remove(target)),button('‹',()=>change(target,-1)),button('›',()=>change(target,1)));const note=document.createElement('span');note.setAttribute('role','status');card.append(photo,row,note);
      let placed=placeAfterQuote(body,group.anchorText,card,group);
-     if(!placed){for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card,group)){card.style.cssText='display:block;color:#51434a;background:#fff7fa;padding:8px;';photo.style.cssText='max-width:100%;max-height:65vh;object-fit:contain;display:block;';placed=true;break;}}catch{}}}
+     if(!placed){for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card,group)){card.style.cssText='display:block;color:#51434a;background:#fff7fa;padding:8px;text-align:center;';photo.style.cssText='max-width:100%;max-height:65vh;object-fit:contain;display:block;margin:0 auto;';row.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;justify-content:center;';placed=true;break;}}catch{}}}
      if(!placed)continue;
      mounted.set(group.id,card);
     }

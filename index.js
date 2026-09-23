@@ -3,6 +3,7 @@ import { tokenVault } from './credentials.js';
 import { scanAppearance, appearanceScope, mergeAppearanceScan, pruneAppearanceScan, formatAppearanceProfiles } from './appearance.js';
 import { mountInline, migrateLegacy, bindSwipe, stripInline } from './inline.js';
 import { mountExcerptBridge } from './excerpt-bridge.js';
+import { mountGift } from './gift.js';
 import { saveSettings } from '../../../../script.js';
 import { updateSelf, checkUpdate } from './updater.js';
 import { mountTools } from './tools-ui.js';
@@ -293,6 +294,7 @@ export async function init(){
  setTimeout(()=>updateCheck(true).catch(()=>{}),4000);setInterval(()=>updateCheck(true).catch(()=>{}),1800000);
  root.querySelector('[data-page="config"]').addEventListener('click',()=>updateCheck().catch(()=>{}));
  on('check-update',()=>updateCheck(true));
+ const gift=mountGift({root,ext,save});new (window.MutationObserver)(()=>{if(panel.dialog.open)gift.firstOpen();}).observe(panel.dialog,{attributes:true,attributeFilter:['open']});if(panel.dialog.open)gift.firstOpen();
  loadDraft();
  try{images=await store.list();renderGallery();renderPreviews();}catch{status('当前浏览器无法打开图库存储，生成后请及时下载。');}
 }

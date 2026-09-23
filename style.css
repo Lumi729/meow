@@ -172,3 +172,24 @@
 #meow-selection-dialog small { display:block; margin-top:8px; color:#8d6a7b; font-size:.76em; }
 #be-hl-bar .meow-be-btn { display:inline-flex; align-items:center; gap:3px; }
 #be-hl-bar .meow-be-btn svg,#be-float-bar .meow-be-btn svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; }
+dialog.meow-gift { box-sizing:border-box; position:fixed; inset:0; margin:auto; height:fit-content; max-height:calc(100dvh - 32px); overflow-y:auto; width:min(420px,calc(100vw - 32px)); max-width:none; padding:28px 22px 20px; border:0; border-radius:24px; background:linear-gradient(160deg,#fff8fb,#ffe6ef 60%,#fcd9e8); color:#674350; text-align:center; overflow:hidden; box-shadow:0 18px 60px #50334555; }
+dialog.meow-gift::backdrop { background:#33223290; backdrop-filter:blur(3px); }
+dialog.meow-gift > * { position:relative; }
+.meow-gift .meow-gift-cat { margin:0 0 6px; font-size:1.6em; }
+.meow-gift .meow-gift-small { margin:0; font-size:.85em; color:#977184; letter-spacing:1px; }
+.meow-gift .meow-gift-line { margin:14px 0 10px; font-size:1.55em; color:#a3486f; letter-spacing:3px; font-weight:700; }
+.meow-gift .meow-gift-sign { margin:12px 0 18px; font-size:.95em; text-align:right; color:#8a5570; }
+.meow-gift .meow-gift-to { margin:6px 0 10px; text-align:left; font-weight:700; }
+.meow-gift .meow-gift-text { margin:0 0 8px; text-align:left; line-height:1.8; text-indent:2em; }
+.meow-gift button { width:100%; padding:11px; border:1px solid #d795b0; border-radius:14px; background:#efbdd2; color:#4a2939; font:inherit; cursor:pointer; }
+.meow-gift .meow-gift-sky { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.meow-gift .meow-gift-sky span { position:absolute; bottom:-20px; color:#e9aec6; opacity:0; animation:meow-gift-float 3.6s ease-in infinite; }
+@keyframes meow-gift-float { 0% { transform:translateY(0) scale(.8); opacity:0; } 15% { opacity:.9; } 100% { transform:translateY(-420px) scale(1.15); opacity:0; } }
+@media (prefers-reduced-motion:reduce) { .meow-gift .meow-gift-sky span { animation:none; opacity:.5; bottom:auto; top:50%; } }
+#meow-panel .meow-about { font-size:.88em; line-height:1.8; color:#8a5570; }
+.meow-gift button:focus-visible { outline:2px solid #a85979; outline-offset:2px; }
+/* Pictures inside the story sit in the middle of the line. */
+.meow-inline-card { text-align:center !important; margin-left:auto !important; margin-right:auto !important; }
+#chat .meow-inline-card .meow-inline-photo { margin-left:auto !important; margin-right:auto !important; }
+.meow-inline-card .meow-inline-actions { justify-content:center; }
+.meow-inline-card > [role=status] { text-align:center; }
