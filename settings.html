@@ -31,13 +31,23 @@
   <p id="meow-destination"></p>
   <button id="meow-tags" type="button">② 只发送勾选内容，生成 tags</button>
   <p id="meow-tags-status" role="status" aria-live="polite"></p><details><summary>副 API 原始返回</summary><textarea id="meow-raw-tags" rows="5" readonly></textarea></details>
-  <div id="meow-scenes"></div>
+  <details><summary>正确的 JSON 示例（普通模式）</summary><small>假设选中原文 id 是 m0p0，原句为“她坐在窗边看书。”。实际 id 和句子必须使用你捕捉到的内容；多图在 scenes 中放多个对象，不要返回多个独立 JSON。</small><pre>{
+  "scenes": [{
+    "title": "窗边阅读",
+    "prompt": "1girl, sitting by a window, reading a book, soft daylight",
+    "negative_prompt": "blurry, low quality",
+    "source_ids": ["m0p0"],
+    "anchor_source_id": "m0p0",
+    "anchor_quote": "她坐在窗边看书。",
+    "anchor_occurrence": 1
+  }]
+}</pre><small>开启多角色模式时，每个对象还需 characters 数组，角色字段为 name、prompt、negative_prompt、x、y。关闭时不用加。</small></details><div id="meow-scenes"></div>
   <label>生成后放在哪里<select id="meow-output"><option value="journal">坏猫猫图文相册（附选中原文）</option><option value="chat">图文相册 + 插入对应原文后</option></select></label>
   <button id="meow-bad-generate" type="button" class="meow-primary">③ 用这些 tags 生成图片</button>
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
   <div id="meow-bad-latest"></div><small>tags 可以编辑后再生成。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><h3>扩展更新 · 0.5.1</h3><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><h3>扩展更新 · 0.5.2</h3><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <button id="meow-repair-inline" type="button">修复旧版正文插图并刷新</button><small>只移除旧版猫猫插图标记，保留原文和已存图片；新版本插图单独保存，不改正文代码。</small>
   <h3>✧ NovelAI</h3><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><label><input id="meow-remember-token" type="checkbox" checked>在此浏览器记住直连 Token</label><button id="meow-forget-token" type="button">清除浏览器记忆</button><button id="meow-save-token" type="button">保存本地 Token</button>
   <small>与酒馆共用 NovelAI 密钥；勾选记住后，直连凭证另存当前浏览器，刷新后复用。输入框保存后清空，不进入配置导出或仓库。</small>

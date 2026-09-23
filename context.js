@@ -55,10 +55,13 @@ export function parseTagPreset(text,filename=''){
 }
 export function parseScenes(text,sourceIds,count,withCharacters=false){
     let raw;try{raw=JSON.parse(String(text).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));}catch{throw new Error('副 API 未返回可解析 JSON，请查看原始返回后重试。');}
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('副 API 必须返回一个含 scenes 数组的 JSON 对象。');
     const scenes=raw.scenes;
     if(!Array.isArray(scenes)||scenes.length!==count)throw new Error(`副 API 应返回 ${count} 个 scenes；没有自动发起生图。`);
     const allowed=new Set(sourceIds);
     return scenes.map((s,i)=>{
+        if(!s||typeof s!=='object'||Array.isArray(s))throw new Error(`第 ${i+1} 幅必须是 JSON 对象。`);
+        if(s.negative_prompt!==undefined&&typeof s.negative_prompt!=='string')throw new Error(`第 ${i+1} 幅 negative_prompt 必须是字符串。`);
         if(typeof s.prompt!=='string'||!s.prompt.trim()||s.prompt.length>16000)throw new Error(`第 ${i+1} 幅提示词无效。`);
         if(!Array.isArray(s.source_ids)||!s.source_ids.length||s.source_ids.some(id=>!allowed.has(id)))throw new Error(`第 ${i+1} 幅原文引用无效。`);
         return {...(withCharacters?{characters:validateCharacters(s.characters)}:{}),title:String(s.title||`画面 ${i+1}`).slice(0,200),prompt:s.prompt,negative_prompt:String(s.negative_prompt||''),source_ids:[...new Set(s.source_ids)],anchor_source_id:typeof s.anchor_source_id==='string'?s.anchor_source_id:'',anchor_quote:typeof s.anchor_quote==='string'?s.anchor_quote:'',anchor_occurrence:Number.isInteger(s.anchor_occurrence)?s.anchor_occurrence:1};
@@ -75,8 +78,8 @@ export function buildTagRequest(config,parts,count){
     if(!config.model?.trim())throw new Error('请填写副 API 模型。');
     return {chat_completion_source:'custom',custom_url:apiBase(config.url),secret_id:config.secret_id,
         model:config.model.trim(),stream:false,temperature:0.7,max_tokens:4096,
-        messages:[{role:'system',content:`${config.preset||TAG_PRESET}\n${config.character_mode?CHARACTER_INSTRUCTIONS:''}\n输出严格 JSON：{"scenes":[{"title":"标题","prompt":"English tags","negative_prompt":"","source_ids":["引用资料 id"],"anchor_source_id":"图片位置的原文 id","anchor_quote":"逐字复制该场景对应的完整原文句子","anchor_occurrence":1}]}。从所有选中的文本整体挑选恰好 ${count} 个不同场景，不是每段各生成 ${count} 幅。每幅只选择一个插图位置，位置应分布在各自场景的句子后。anchor_quote 必须是 anchor_source_id 的原文连续片段，不能改写、不能含标签，重复出现时 anchor_occurrence 从 1 开始计数。appearance_reference 是人物身份资料：严格区分每个名字对应的发型、发色、眼睛和服装，不把不同角色特征混合。资料未说明的特征不要自行更换。source_ids 只能引用用户提供的 id。不要输出代码围栏或解释。`},
-        {role:'user',content:JSON.stringify({appearance_reference:config.appearance||'',passages:parts.map(p=>({id:p.id,speaker:p.name,section:p.part,text:p.text}))})}]};
+        messages:[{role:'system',content:`${config.preset||TAG_PRESET}\n${config.character_mode?CHARACTER_INSTRUCTIONS:''}\n输出严格 JSON：{"scenes":[{"title":"标题","prompt":"English tags","negative_prompt":"","source_ids":["引用资料 id"],"anchor_source_id":"图片位置的原文 id","anchor_quote":"逐字复制该场景对应的完整原文句子","anchor_occurrence":1}]}。从所有选中的文本整体挑选恰好 ${count} 个不同场景，不是每段各生成 ${count} 幅。每幅只选择一个插图位置，位置应分布在各自场景的句子后。anchor_quote 必须是 anchor_source_id 的原文连续片段，不能改写、不能含标签，重复出现时 anchor_occurrence 从 1 开始计数。appearance_reference 是人物身份资料：严格区分每个名字对应的发型、发色、眼睛和服装，不把不同角色特征混合。资料未说明的特征不要自行更换。source_ids 只能引用用户提供的 id。不要输出代码围栏或解释。\n【最终输出协议】无论预设中采用何种叙述方式，最终回复只允许一个可由 JSON.parse 解析的对象。第一字符必须是 {，最后字符必须是 }。顶层必须是 scenes 数组；不要返回 JSON 字符串、多个对象、前言、结语、Markdown、注释或省略号。所有键和字符串必须使用英文双引号；字符串中的双引号和换行必须按 JSON 转义；禁止尾随逗号。prompt、negative_prompt、title、anchor_quote 都是字符串；source_ids 是字符串数组；anchor_occurrence 是从 1 开始的整数。negative_prompt 为空时用空字符串，不用 null 或数组。${config.character_mode?'每个 scene 还必须有 characters 数组，并遵守前面的角色字段要求。':'未开启多角色模式时不要额外输出 characters。'}发送前自行检查：scenes 数量恰好为 ${count}，引用 id 全部存在，anchor_quote 逐字取自对应 passage，JSON 语法有效。`},
+        {role:'user',content:JSON.stringify({appearance_reference:config.appearance||'',...(typeof config.original_context==='string'&&config.original_context?{original_context:`这是原文，用于理解生图 tag：\n${config.original_context}`} : {}),passages:parts.map(p=>({id:p.id,speaker:p.name,section:p.part,text:p.text}))})}]};
 }
 
 /** Discover balanced XML-style tags without rendering or executing chat HTML. */

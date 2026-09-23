@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Window} from 'happy-dom';
-import {cameraRecords,mountCamera} from '../camera.js';
+import {cameraRecords,mountCamera,buildCameraRequest} from '../camera.js';
 const mes='<tracker_home><entry>客厅｜午后，在线｜空沙发和窗边的猫。</entry><entry>走廊｜晚上，在线｜顶灯亮着。</entry></tracker_home><tracker_health>DO NOT SEND</tracker_health>';
 test('camera capture keeps full records and excludes other sections',()=>{assert.deepEqual(cameraRecords(mes).map(x=>x.text),['客厅｜午后，在线｜空沙发和窗边的猫。','走廊｜晚上，在线｜顶灯亮着。']);assert.throws(()=>cameraRecords('none'));});
 test('iframe camera flow validates source, generates isolated tags and returns persisted images',async()=>{
@@ -15,9 +15,16 @@ test('iframe camera flow validates source, generates isolated tags and returns p
  send({postMessage:()=>{}});assert.equal(opened,0);send();await settle();assert.equal(opened,1);
  const buttons=()=>[...document.querySelectorAll('.meow-camera button')];
  globalThis.fetch=async(_url,opts)=>{const body=JSON.parse(opts.body);requests.push(body);const id=JSON.parse(body.messages[1].content).passages[0].id;return {ok:true,json:async()=>({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'empty room',source_ids:[id]}]})}}]})};};
- buttons()[0].click();await settle();assert.equal(requests.length,1);assert.equal(JSON.parse(requests[0].messages[1].content).passages.length,1);assert.ok(!JSON.stringify(requests).includes('DO NOT SEND'));
+ buttons()[0].click();await settle();assert.equal(requests.length,1);assert.equal(JSON.parse(requests[0].messages[1].content).passages.length,1);assert.ok(JSON.parse(requests[0].messages[1].content).original_context.includes('DO NOT SEND'));assert.equal(JSON.parse(requests[0].messages[1].content).passages[0].text,'客厅｜午后，在线｜空沙发和窗边的猫。');
  buttons()[1].click();await settle();assert.equal(images.length,1);assert.equal(out.at(-1).images[0].record,'客厅｜午后，在线｜空沙发和窗边的猫。');
  send(frame.contentWindow,'meow-camera-list');assert.equal(out.at(-1).images.length,1);
  key='other';buttons()[1].click();await settle();assert.equal(images.length,1);assert.match(document.querySelector('[role=status]').textContent,/变化/);
  api.dispose();w.happyDOM.abort();
+});
+
+test('camera combines saved tag preset, full source message and appearance without altering the preset',()=>{
+ const secondary={preset:'My saved tag style',model:'mock',url:'https://example.com/v1'},record=cameraRecords(mes)[0];
+ const request=buildCameraRequest(secondary,record,'本条原文：人物正坐在窗边。','人物：白发');
+ assert.equal(secondary.preset,'My saved tag style');assert.ok(request.messages[0].content.includes('My saved tag style'));assert.ok(request.messages[0].content.includes('最终输出协议'));
+ const sent=JSON.parse(request.messages[1].content);assert.equal(sent.original_context,'这是原文，用于理解生图 tag：\n本条原文：人物正坐在窗边。');assert.equal(sent.appearance_reference,'人物：白发');assert.equal(sent.passages.length,1);
 });
