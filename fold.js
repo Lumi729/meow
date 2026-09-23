@@ -32,7 +32,8 @@ export function foldHints(root){
   let prev=label||small.previousElementSibling;
   while(prev&&prev.classList.contains('meow-hint-text'))prev=prev.previousElementSibling;
   if(label)label.after(small);
-  if(prev?.classList.contains('meow-hint-row'))prev.append(dot);
+  if(prev?.tagName==='SUMMARY')prev.append(dot);
+  else if(prev?.classList.contains('meow-hint-row'))prev.append(dot);
   else if(prev?.matches('details')&&prev.querySelector(':scope > summary')&&prev.parentElement===small.parentElement)prev.querySelector(':scope > summary').append(dot);
   else if(prev&&!prev.matches('details,hr')&&prev.parentElement===small.parentElement){const row=doc.createElement('div');row.className='meow-hint-row';prev.replaceWith(row);row.append(prev,dot);}
   else{const row=doc.createElement('div');row.className='meow-hint-row meow-hint-alone';small.before(row);row.append(dot);}
