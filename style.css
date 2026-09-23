@@ -83,3 +83,46 @@
 .meow-inline-card>[role=status] {display:block;font-size:12px;opacity:.8;}
 .meow-inline-card>small {white-space:pre-wrap;max-height:8em;overflow:auto;}
 #meow-panel #meow-latest,#meow-panel #meow-bad-latest {margin-top:14px;}
+
+/* 0.6: folded boxes, website tools, mask painter, update badge */
+#meow-panel details.meow-fold,#meow-panel details.meow-list,#meow-panel details.meow-tools { margin:10px 0; border:1px solid var(--meow-border); border-radius:12px; background:#fff; }
+#meow-panel details.meow-fold > summary,#meow-panel details.meow-list > summary,#meow-panel details.meow-tools > summary { display:flex; gap:8px; align-items:baseline; padding:10px 12px; cursor:pointer; font-size:.88em; list-style:none; }
+#meow-panel details > summary::-webkit-details-marker { display:none; }
+#meow-panel details.meow-fold > summary::before,#meow-panel details.meow-list > summary::before,#meow-panel details.meow-tools > summary::before { content:'\25B8'; color:#b66488; }
+#meow-panel details[open].meow-fold > summary::before,#meow-panel details[open].meow-list > summary::before,#meow-panel details[open].meow-tools > summary::before { content:'\25BE'; }
+#meow-panel .meow-fold-title { flex:none; font-weight:600; }
+#meow-panel .meow-fold-preview { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#9f798b; font-size:.92em; }
+#meow-panel details.meow-fold > label,#meow-panel details.meow-fold > textarea { margin:0 10px 10px; }
+#meow-panel details.meow-fold > label { margin-top:0; }
+#meow-panel details.meow-list > div,#meow-panel details.meow-tools > :not(summary) { margin-left:10px; margin-right:10px; }
+#meow-panel details.meow-tools { padding-bottom:10px; }
+#meow-panel .meow-tools h4 { margin:16px 10px 4px; font-size:.92em; color:#8a5570; }
+#meow-panel #meow-tools-badge { color:#b66488; font-weight:600; }
+#meow-panel .meow-tool-preview { margin:6px 10px; }
+#meow-panel .meow-tool-stack { position:relative; display:inline-block; max-width:220px; }
+#meow-panel .meow-tool-stack img { display:block; max-width:220px; max-height:260px; border-radius:10px; }
+#meow-panel .meow-tool-stack .meow-tool-mask { position:absolute; inset:0; width:100%; height:100%; opacity:.55; mix-blend-mode:screen; filter:sepia(1) saturate(6) hue-rotate(290deg); }
+#meow-panel .meow-tool-item { display:grid; grid-template-columns:72px minmax(0,1fr); gap:0 10px; align-items:start; margin:8px 0; padding:8px; border:1px dashed #ddb3c5; border-radius:12px; }
+#meow-panel .meow-tool-item > .meow-tool-thumb { grid-row:span 6; width:72px; height:96px; object-fit:cover; border-radius:8px; }
+#meow-panel .meow-tool-item label,#meow-panel .meow-tool-item button,#meow-panel .meow-tool-item small { margin-top:4px; }
+#meow-panel .meow-dot { display:inline-block; margin-left:3px; padding:0 5px; border-radius:8px; background:#d4507e; color:#fff; font-size:.72em; vertical-align:top; }
+#meow-panel #meow-update-state { font-size:.85em; color:#a3486f; }
+#meow-viewer .meow-use { margin:10px 0; padding:6px 10px; border:1px dashed #ddb3c5; border-radius:12px; }
+#meow-viewer .meow-use summary { cursor:pointer; font-size:.9em; }
+#meow-mask-editor { width:min(900px,calc(100vw - 12px)); max-width:none; max-height:calc(100dvh - 12px); padding:12px; border:0; border-radius:18px; background:#fff8fb; color:#674350; overflow:auto; }
+#meow-mask-editor::backdrop { background:#33223285; }
+#meow-mask-editor .meow-mask-stage { position:relative; width:100%; }
+#meow-mask-editor canvas { display:block; width:100%; height:auto; border-radius:10px; }
+#meow-mask-editor canvas + canvas { position:absolute; inset:0; opacity:.55; touch-action:none; cursor:crosshair; filter:sepia(1) saturate(6) hue-rotate(290deg); }
+#meow-mask-editor .meow-row { display:flex; flex-wrap:wrap; gap:8px; }
+#meow-mask-editor button { padding:10px 12px; border:1px solid #ddb3c5; border-radius:12px; background:#ffe6ef; color:#674350; font:inherit; }
+#meow-mask-editor label { display:block; margin-top:10px; font-size:.88em; }
+#meow-mask-editor input[type=range] { width:100%; accent-color:#b66488; }
+#meow-panel .meow-tabs { grid-template-columns:repeat(5,minmax(0,1fr)) 32px; gap:3px; }
+#meow-panel #meow-close-top { grid-column:6; width:32px; }
+#meow-panel .meow-tabs button[data-page] { font-size:.76em; padding:7px 1px; }
+#meow-panel .meow-quick { margin:12px 0 4px; padding:8px 10px; border:1px dashed #ddb3c5; border-radius:14px; background:#fff; }
+#meow-panel .meow-quick .meow-row { gap:6px; }
+#meow-panel .meow-quick button { margin:4px 0; padding:7px 10px; font-size:.8em; }
+#meow-panel [data-view=tools] h4 { margin:20px 0 4px; font-size:.95em; color:#8a5570; border-top:1px dashed #eedce5; padding-top:12px; }
+#meow-panel #meow-tools-badge,#meow-panel #meow-tools-badge-page { color:#b66488; font-weight:600; font-size:.9em; }

@@ -117,5 +117,16 @@ field('send-preview','她站在雨里');click('tags');await settle();assert.matc
 await new Promise(r=>setTimeout(r,400));current='chat-other';await events.chat();assert.equal($('scenes').children.length,0);assert.equal($('send-preview').value,'');
 current='chat-manual';await events.chat();assert.equal($('send-preview').value,'她站在雨里');assert.equal($('scenes').querySelector('textarea').value,'girl in rain');
 click('bad-generate');await settle();const manualEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.source[0]?.id==='manual');assert.ok(manualEntry);
+// Big boxes fold into one-line summaries that preview their content.
+assert.ok($('prompt').closest('details.meow-fold'));$('prompt').value='folded preview text';assert.match($('prompt').closest('details').querySelector('.meow-fold-preview').textContent,/folded preview/);
+// "Use this image" → vibe reference: encoded once, then sent with the official request.
+field('model','nai-diffusion-4-5-full');field('transport','bridge');field('cfg_rescale','0');
+let vibeCalls=[],genBody;globalThis.fetch=async(url,options)=>{if(String(url).includes('encode-vibe')){vibeCalls.push(JSON.parse(options.body));return new Response(new Uint8Array([1,2,3]));}if(String(url).includes('generate-image')){genBody=JSON.parse(options.body);return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));}return new Response('{}');};
+$('latest').querySelector('.meow-thumb').click();await settle();
+[...$('viewer').querySelectorAll('.meow-use button')].find(b=>b.textContent==='氛围参考').click();await settle();assert.ok(!$('viewer').open);assert.match($('tools-badge').textContent,/氛围×1/);
+click('generate');await settle();assert.equal(vibeCalls.length,1);assert.equal(vibeCalls[0].model,'nai-diffusion-4-5-full');assert.deepEqual(genBody.parameters.reference_image_multiple,['AQID']);
+click('generate');await settle();assert.equal(vibeCalls.length,1);
+// Website tools live on their own page; the drawing page keeps quick buttons.
+click('close');click('floating');document.querySelector('[data-page="draw"]').click();document.querySelector('[data-tool-jump="director"]').click();await settle();assert.ok(!document.querySelector('[data-view="tools"]').hidden);assert.ok(document.querySelector('[data-view="draw"]').hidden);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');
 await window.happyDOM.abort();

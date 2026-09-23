@@ -1,7 +1,7 @@
 <section id="meow-panel" aria-label="猫猫星绘">
  <header class="meow-header"><h2>ฅ^•ﻌ•^ฅ · 猫猫星绘 ✦</h2><p>把小小的想象，画成闪闪的星星。</p></header>
  <nav class="meow-tabs" aria-label="猫猫星绘页面"><button id="meow-close-top" data-meow-close type="button" aria-label="关闭猫猫星绘">✕</button>
-  <button type="button" data-page="draw" aria-pressed="true">星绘</button><button type="button" data-page="gallery" aria-pressed="false">图库</button><button type="button" data-page="bad" aria-pressed="false">坏猫猫 ♡</button><button type="button" data-page="config" aria-pressed="false">设置</button>
+  <button type="button" data-page="draw" aria-pressed="true">星绘</button><button type="button" data-page="tools" aria-pressed="false">官网</button><button type="button" data-page="gallery" aria-pressed="false">图库</button><button type="button" data-page="bad" aria-pressed="false">坏猫猫 ♡</button><button type="button" data-page="config" aria-pressed="false">设置<span id="meow-update-dot" class="meow-dot" hidden>新</span></button>
  </nav>
  <section data-view="draw">
   <div class="meow-presets"><label>绘图配置<select id="meow-preset-list"><option value="">当前配置</option></select></label><input id="meow-preset-name" aria-label="配置名称" placeholder="给这套配置起个名字"><div class="meow-row"><button id="meow-preset-save" type="button">保存配置</button><button id="meow-preset-delete" type="button">删除配置</button><button id="meow-preset-export" type="button">导出</button><label class="meow-file">导入<input id="meow-preset-import" type="file" accept=".json"></label></div></div>
@@ -14,8 +14,47 @@
   <div class="meow-checks"><label><input id="meow-decrisper" type="checkbox">Decrisper</label><label><input id="meow-variety_boost" type="checkbox">Variety Boost</label><label><input id="meow-sm" type="checkbox">SMEA（V2/V3）</label><label><input id="meow-sm_dyn" type="checkbox">SMEA DYN</label><label><input id="meow-anlas_guard" type="checkbox">节省模式：≤28 步、≤1MP、不放大</label></div>
   <small>会消耗 Anlas，节省模式不保证免费。固定正面 + 本次提示词一起发送；负面同理。模型不支持的设置会在发送前拦截。</small>
 </details>
+  <div class="meow-quick"><small>官网功能 <span id="meow-tools-badge"></span></small><div class="meow-row"><button type="button" data-tool-jump="img2img">图生图</button><button type="button" data-tool-jump="inpaint">局部重绘</button><button type="button" data-tool-jump="vibe">氛围</button><button type="button" data-tool-jump="reference">精确参考</button><button type="button" data-tool-jump="reverse">看图反推</button><button type="button" data-tool-jump="meta">读原图信息</button><button type="button" data-tool-jump="director">导演 / 放大</button></div></div>
   <small id="meow-generation-timing" role="status" aria-live="polite"></small><div id="meow-latest"></div>
  </section>
+  <section data-view="tools" hidden>
+   <h3>✦ 官网功能 <span id="meow-tools-badge-page"></span></h3>
+   <small>这些功能直连 NovelAI 官网：需要在设置里保存 Token，按官网规则消耗 Anlas。图库大图里点「用这张图…」可以直接把图带过来。</small>
+   <h4 id="meow-sec-base">基础图</h4>
+   <label>模式<select id="meow-tool-mode"><option value="generate">不用基础图（文生图）</option><option value="img2img">图生图</option><option value="inpaint">局部重绘</option></select></label>
+   <label class="meow-file">从相册选基础图<input id="meow-tool-image-file" type="file" accept="image/*"></label>
+   <div id="meow-tool-preview" class="meow-tool-preview"></div>
+   <div class="meow-grid"><label>重绘强度（0.01–0.99）<input id="meow-tool-strength" type="number" min="0.01" max="0.99" step="0.01"></label><label>噪声（图生图，0–0.99）<input id="meow-tool-noise" type="number" min="0" max="0.99" step="0.01"></label></div>
+   <label><input id="meow-tool-original" type="checkbox" checked>局部重绘时叠加原图（没涂的地方保持原样）</label>
+   <div class="meow-row"><button id="meow-tool-mask" type="button">画蒙版</button><button id="meow-tool-size" type="button">尺寸跟随基础图</button><button id="meow-tool-clear" type="button">移除基础图</button></div>
+   <h4 id="meow-sec-vibe">氛围迁移 · Vibe Transfer</h4>
+   <label class="meow-file">从相册添加氛围参考图<input id="meow-vibe-file" type="file" accept="image/*"></label><div id="meow-vibe-list"></div>
+   <small>V4 以后每张参考图第一次使用要先编码（官网会收少量 Anlas），同一张图、同样的信息提取值之后不再重复编码。V5 暂不支持氛围迁移。</small>
+   <h4 id="meow-sec-reference">精确参考 · Precise Reference</h4>
+   <label class="meow-file">从相册添加精确参考图<input id="meow-ref-file" type="file" accept="image/*"></label><div id="meow-ref-list"></div>
+   <small>支持 V4.5 / V5。图片会自动补黑边成官网要求的尺寸。</small>
+   <h4 id="meow-sec-reverse">看图反推 tags</h4>
+   <label class="meow-file">从相册选任意图片<input id="meow-reverse-file" type="file" accept="image/*"></label>
+   <div id="meow-reverse-preview" class="meow-tool-preview"></div>
+   <label>反推要求（发给副 API）<textarea id="meow-reverse-prompt" rows="3"></textarea></label>
+   <button id="meow-reverse-run" type="button">用副 API 反推 tags</button>
+   <label>反推结果（可修改）<textarea id="meow-reverse-result" rows="4"></textarea></label>
+   <div class="meow-row"><button id="meow-reverse-replace" type="button">填进「这次想画什么」</button><button id="meow-reverse-append" type="button">追加到「这次想画什么」</button></div>
+   <small>任何图都行（网图、截图、别人画的）。图片会缩到 1024 像素以内发给设置里的副 API，需要模型能看图（例如 Gemini、GPT-4o、Claude）。</small>
+   <h4 id="meow-sec-meta">读取 NovelAI 原图信息</h4>
+   <label class="meow-file">从相册选 NovelAI 原图<input id="meow-meta-file" type="file" accept="image/*"></label>
+   <label>读到的信息<textarea id="meow-meta-view" rows="5" readonly placeholder="读取后在这里显示提示词和参数"></textarea></label>
+   <div class="meow-checks"><label><input id="meow-meta-prompt" type="checkbox" checked>正面</label><label><input id="meow-meta-negative" type="checkbox" checked>负面</label><label><input id="meow-meta-characters" type="checkbox" checked>角色</label><label><input id="meow-meta-settings" type="checkbox" checked>参数</label><label><input id="meow-meta-seed" type="checkbox">种子</label></div>
+   <button id="meow-meta-import" type="button">导入到星绘</button>
+   <h4 id="meow-sec-director">导演工具与放大</h4>
+   <label>工具<select id="meow-director-tool"></select></label>
+   <div class="meow-grid"><label>表情<select id="meow-director-emotion"></select></label><label>强度（0–5）<input id="meow-director-level" type="number" min="0" max="5" step="1" value="0"></label></div>
+   <label>补充提示（上色 / 改表情可填）<input id="meow-director-prompt"></label>
+   <button id="meow-director-run" type="button">对基础图使用这个工具</button><small>导演工具和放大都作用在上面的「基础图」，结果存进图库。</small>
+   <label><input id="meow-tools-bad" type="checkbox">坏猫猫生图也带上氛围 / 精确参考</label>
+   <button id="meow-tools-reset" type="button">清空官网功能设置</button>
+   <button id="meow-tools-generate" type="button" class="meow-primary">✦ 带着这些设置去生图</button>
+  </section>
  <section data-view="gallery" hidden>
   <div class="meow-row"><h3>星星相册</h3><button id="meow-gallery-refresh" type="button">刷新图库</button></div>
   <label>筛选<select id="meow-gallery-filter"><option value="all">全部图片</option><option value="chat">当前聊天</option><option value="bad">坏猫猫图文</option></select></label>
@@ -26,7 +65,7 @@
   <div class="meow-grid"><label>最近消息条数<input id="meow-context-count" type="number" value="5" min="1" max="50"></label><label>这次生成几张<input id="meow-image-count" type="number" value="1" min="1" max="8"></label></div>
   <label>补充分区规则（JSON，可选）<textarea id="meow-rules" rows="4" spellcheck="false"></textarea></label><small>自动识别 &lt;标签&gt;…&lt;/标签&gt;，支持中文、英文和属性；嵌套内容保留在最外层的一整对中，不拆开。自动识别的分区需手动勾选；特殊标记可用下面的 start/end 规则补充。</small>
   <button id="meow-capture" type="button">① 捕捉当前聊天</button>
-  <details><summary>人物外貌档案 · 保存 / 检查 / 修改</summary><label><input id="meow-appearance-enabled" type="checkbox" checked>随原文发送已选人物档案</label><button id="meow-appearance-scan" type="button">扫描角色与关联世界书</button><p id="meow-appearance-state"></p><label>已保存的人物<select id="meow-appearance-profile"></select></label><label>人物姓名 / 称呼<input id="meow-appearance-name" placeholder="例如：陈野 / 黎千"></label><label><input id="meow-appearance-use" type="checkbox">在当前角色的聊天中使用此档案</label><small id="meow-appearance-source"></small><textarea id="meow-appearance-text" rows="8" placeholder="检查并填写发型、发色、眼睛、体型和服装；不同人物请分开保存。"></textarea><div class="meow-row"><button id="meow-appearance-save" type="button">保存人物档案</button><button id="meow-appearance-new" type="button">新建人物</button><button id="meow-appearance-latest" type="button">载入最新扫描候选</button><button id="meow-appearance-delete" type="button">删除档案</button></div><small>扫描不会覆盖已保存的修改。世界书条目可能包含多人，请检查姓名并按需拆成人物档案。未勾选的档案不发送；普通坏猫猫与监控生图共用已选档案。</small><label>实际发送的人物资料<textarea id="meow-appearance-preview" rows="5" readonly></textarea></label></details><div id="meow-context-list"></div>
+  <details><summary>人物外貌档案 · 保存 / 检查 / 修改</summary><label><input id="meow-appearance-enabled" type="checkbox" checked>随原文发送已选人物档案</label><button id="meow-appearance-scan" type="button">扫描角色与关联世界书</button><p id="meow-appearance-state"></p><label>已保存的人物<select id="meow-appearance-profile"></select></label><label>人物姓名 / 称呼<input id="meow-appearance-name" placeholder="例如：陈野 / 黎千"></label><label><input id="meow-appearance-use" type="checkbox">在当前角色的聊天中使用此档案</label><small id="meow-appearance-source"></small><textarea id="meow-appearance-text" rows="8" placeholder="检查并填写发型、发色、眼睛、体型和服装；不同人物请分开保存。"></textarea><div class="meow-row"><button id="meow-appearance-save" type="button">保存人物档案</button><button id="meow-appearance-new" type="button">新建人物</button><button id="meow-appearance-latest" type="button">载入最新扫描候选</button><button id="meow-appearance-delete" type="button">删除档案</button></div><small>扫描不会覆盖已保存的修改。世界书条目可能包含多人，请检查姓名并按需拆成人物档案。未勾选的档案不发送；普通坏猫猫与监控生图共用已选档案。</small><label>实际发送的人物资料<textarea id="meow-appearance-preview" rows="5" readonly></textarea></label></details><details class="meow-list" id="meow-context-box"><summary>捕捉到的原文 · <span id="meow-context-count">还没有捕捉</span></summary><div id="meow-context-list"></div></details>
   <label>将发送的原文预览（可直接改写或手写）<textarea id="meow-send-preview" rows="6" placeholder="懒得捕捉时，直接在这里写想画的内容，然后点②。"></textarea></label><small>在这里改过或手写的内容会原样发给副 API；这样生成的图放进图文相册，不插入正文。重新勾选上面的原文会恢复成勾选内容。捕捉的原文、预览和返回的 tags 会自动保存，关掉面板、切出去再回来都还在。</small>
   <p id="meow-destination"></p>
   <button id="meow-tags" type="button">② 只发送勾选内容，生成 tags</button>
@@ -47,14 +86,14 @@
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
   <div id="meow-bad-latest"></div><small>tags 可以编辑后再生成。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><h3>扩展更新 · 0.5.4</h3><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><h3>扩展更新 · <span id="meow-version">0.6.0</span></h3><p id="meow-update-state" role="status"></p><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <button id="meow-repair-inline" type="button">修复旧版正文插图并刷新</button><small>只移除旧版猫猫插图标记，保留原文和已存图片；新版本插图单独保存，不改正文代码。</small>
   <h3>✧ NovelAI</h3><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><label><input id="meow-remember-token" type="checkbox" checked>在此浏览器记住直连 Token</label><button id="meow-forget-token" type="button">清除浏览器记忆</button><button id="meow-save-token" type="button">保存本地 Token</button>
   <small>与酒馆共用 NovelAI 密钥；勾选记住后，直连凭证另存当前浏览器，刷新后复用。输入框保存后清空，不进入配置导出或仓库。</small>
   <h3>♡ 副 API（OpenAI 兼容）</h3><label>基础地址<input id="meow-secondary-url" type="url" placeholder="https://服务商/v1"></label><label>模型<input id="meow-secondary-model" placeholder="手动填写或从下方选择"></label><div class="meow-row"><button id="meow-fetch-models" type="button">拉取模型</button><select id="meow-secondary-model-list" aria-label="副 API 模型列表"><option value="">拉取后选择模型</option></select></div><small id="meow-models-state" role="status">先填写基础地址并保存副 API 密钥，再拉取模型。</small><label>副 API 密钥<input id="meow-secondary-key" type="password" autocomplete="off"></label><button id="meow-save-secondary" type="button">保存副 API 密钥</button><p id="meow-secondary-state"></p><small>使用酒馆的 Custom 密钥管理，单独记录一把「Meow secondary」密钥 ID；保存后会自动切回酒馆原来的主密钥，不影响主聊天 API。发送目标会在原文确认区显示。</small>
   <h3>生成 tags 的预设</h3><textarea id="meow-tag-preset" rows="8"></textarea><div class="meow-row"><label class="meow-file">导入预设<input id="meow-tag-import" type="file" accept=".txt,.json"></label><button id="meow-tag-export" type="button">导出预设</button></div><small>支持 TXT、prompt/system_prompt/messages JSON，以及酒馆 prompts/prompt_order。仅导入文本指令，不执行脚本；预设会与勾选原文一起发送给副 API。</small>
   <h3>悬浮按钮与入口</h3><label class="meow-check"><input id="meow-top-enabled" type="checkbox">显示顶栏入口</label><label class="meow-check"><input id="meow-floating-enabled" type="checkbox">显示悬浮按钮</label><label>普通模式大小<input id="meow-floating-size" type="range" min="36" max="120" step="1"><output id="meow-size-output"></output></label><label>坏猫猫模式大小<input id="meow-bad-size" type="range" min="36" max="120" step="1"><output id="meow-bad-size-output"></output></label><label>顶栏图标链接<input id="meow-top-image" type="url" placeholder="留空使用默认星星（https://…）"></label><label>普通模式图片链接<input id="meow-normal-image" type="url" placeholder="留空使用小动物手机"></label><label>坏猫猫图片链接<input id="meow-bad-image" type="url" placeholder="留空使用爱字图片"></label><button id="meow-launcher-reset" type="button">恢复默认位置和图片</button><small>默认图片已随扩展附带，无需图床；自定义链接会向该图片地址发起请求。</small>
-  <h3>官网高级参数</h3><label>生图通道<select id="meow-transport"><option value="bridge">自动选择（高级参数自动直连）</option><option value="direct">始终直连 NovelAI（完整参数）</option></select></label><small>两种方式都请求 NovelAI 官方。自动模式下，基础参数复用酒馆转发；Rescale、Variety、角色提示及高级 JSON 自动直连官方，发送完整参数。直连可记住本浏览器的 Token，刷新后自动复用。其他扩展可以采用自己的转发方式，不受这里的接口限制。</small><label>自定义官方模型 API 标识<input id="meow-direct-model" placeholder="留空使用星绘页所选模型"></label><small>官网已有 V5，但官方 schema 没有列出模型枚举。这里可填写你从官方请求确认的标识，不预填猜测值。</small><label>完整 parameters JSON<textarea id="meow-direct-params" rows="8" spellcheck="false"></textarea></label><div class="meow-row"><button id="meow-advanced-example" type="button">填入 V4 角色提示示例</button><label class="meow-file">导入官方请求 JSON<input id="meow-advanced-import" type="file" accept=".json"></label></div><small>官网直连可传递 cfg_rescale、v4_prompt / v4_negative_prompt 的角色提示、reference_*、director_reference_* 等官方 parameters；填写结构必须匹配模型。固定正负面仍作为 base_caption，始终一次一张。直连需要本浏览器保存的 Token，可能受浏览器跨域限制。此处支持文生图请求，不是官网画布或局部重绘编辑器。</small>
+  <h3>官网高级参数</h3><label>生图通道<select id="meow-transport"><option value="bridge">自动选择（高级参数自动直连）</option><option value="direct">始终直连 NovelAI（完整参数）</option></select></label><small>两种方式都请求 NovelAI 官方。自动模式下，基础参数复用酒馆转发；Rescale、Variety、角色提示及高级 JSON 自动直连官方，发送完整参数。直连可记住本浏览器的 Token，刷新后自动复用。其他扩展可以采用自己的转发方式，不受这里的接口限制。</small><label>自定义官方模型 API 标识<input id="meow-direct-model" placeholder="留空使用星绘页所选模型"></label><small>一般留空即可；V5 已在模型列表里（nai-diffusion-5-full / curated）。只有官网出了列表里没有的新模型时才需要填。</small><label>完整 parameters JSON<textarea id="meow-direct-params" rows="8" spellcheck="false"></textarea></label><div class="meow-row"><button id="meow-advanced-example" type="button">填入 V4 角色提示示例</button><label class="meow-file">导入官方请求 JSON<input id="meow-advanced-import" type="file" accept=".json"></label></div><small>官网直连可传递 cfg_rescale、v4_prompt / v4_negative_prompt 的角色提示、reference_*、director_reference_* 等官方 parameters；填写结构必须匹配模型。固定正负面仍作为 base_caption，始终一次一张。直连需要本浏览器保存的 Token，可能受浏览器跨域限制。图生图、局部重绘、氛围、精确参考等在星绘页「官网功能」里设置。</small>
  </section>
  <p id="meow-status" role="status" aria-live="polite">准备好就开始吧 ♡</p>
  <button id="meow-close" data-meow-close type="button">✕ 关闭猫猫星绘</button>

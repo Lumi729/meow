@@ -68,3 +68,15 @@ Verified official ST docs and local 1.19 source: context.updateMessageBlock(mess
 - `meow-camera-delete` + `id`：从图库删除并回传最新 `meow-camera-images`。确认弹窗由监控屏自己负责。
 
 出错时回传 `meow-camera-error`（message 为中文说明）。
+
+## 官网功能（0.6.0）
+
+全部在浏览器直连，Authorization: Bearer 本地保存的 NovelAI Token。
+
+- 生图：POST https://image.novelai.net/ai/generate-image。图生图 action=img2img，parameters.image/strength/noise/extra_noise_seed/img2img；局部重绘 action=infill，model 加 -inpainting，parameters.mask（8×8 对齐的黑白 PNG，白色重画）、inpaintImg2ImgStrength、add_original_image。
+- 氛围迁移：V4 起先 POST /ai/encode-vibe {image, information_extracted, model}，返回二进制，base64 后放进 reference_image_multiple，配 reference_strength_multiple 与 normalize_reference_strength_multiple。V3 直接放原图并带 reference_information_extracted_multiple。V5 不支持。
+- 精确参考：director_reference_images（补黑边到 1024×1536 / 1536×1024 / 1472×1472）、director_reference_descriptions、director_reference_information_extracted、director_reference_strength_values、director_reference_secondary_strength_values（= 1 − 保真度）。
+- 导演工具：POST https://image.novelai.net/ai/augment-image {req_type, width, height, image, prompt, defry}；放大：POST https://api.novelai.net/ai/upscale {image, width, height, scale:4}。
+- V5：nai-diffusion-5-full / nai-diffusion-5-curated，必须带 v4_prompt / v4_negative_prompt。
+- 图片信息：读取 PNG 的 tEXt / iTXt / zTXt，Comment 为 JSON，Source 为模型名。
+- 新版本检查：POST /api/extensions/version {extensionName, global}；版本号来自 raw.githubusercontent.com 上的 manifest.json。

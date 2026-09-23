@@ -1,4 +1,5 @@
 export const MODELS = Object.freeze({
+    'nai-diffusion-5-full': 'V5 Full', 'nai-diffusion-5-curated': 'V5 Curated',
     'nai-diffusion-4-5-full': 'V4.5 Full', 'nai-diffusion-4-5-curated': 'V4.5 Curated',
     'nai-diffusion-4-full': 'V4 Full', 'nai-diffusion-4-curated-preview': 'V4 Curated',
     'nai-diffusion-3': 'Anime V3', 'nai-diffusion-furry-3': 'Furry V3', 'nai-diffusion-2': 'Anime V2',
@@ -25,7 +26,7 @@ export function buildRequest(settings, randomSeed=()=>crypto.getRandomValues(new
     const steps=numberIn(s.steps,1,50,'步数');
     if(s.anlas_guard && (width*height>1048576||steps>28||Number(s.upscale_ratio)>1)) throw new Error('节省模式限制 28 步、1,048,576 像素且不放大；需要更高配置请关闭节省模式（可能额外计费）。');
     const seed=numberIn(s.seed,-1,4294967295,'种子');
-    const supportsSm=!s.model.includes('diffusion-4')&&s.sampler!=='ddim';
+    const supportsSm=!/diffusion-(4|5)/.test(s.model)&&s.sampler!=='ddim';
     if((s.sm||s.sm_dyn)&&!supportsSm) throw new Error('SMEA 仅在 V2/V3 且非 DDIM 时启用，请关闭 SMEA。');
     if(s.sm_dyn&&!s.sm) throw new Error('SMEA DYN 需要同时开启 SMEA。');
     return {prompt,negative_prompt:combine(s.negative_prompt,s.extra_negative),model:s.model,width,height,steps,

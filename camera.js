@@ -64,7 +64,9 @@ export function mountCamera({root,context,chatKey,panel,page,secondary,run,isBus
   state.textContent='tags 已返回，检查后点②生成图片。';
  }));
  const cancelButton=node('button','停止等待');cancelButton.type='button';cancelButton.addEventListener('click',()=>{if(working)stop?.();});
- view.append(heading,note,info,originalLabel,appearanceLabel,cards,generateTags,tags,generation,cancelButton,state,action('返回监控屏',()=>panel.dialog.close()));
+ const cardBox=document.createElement('details'),cardSummary=node('summary','镜头');cardBox.className='meow-list';cardBox.append(cardSummary,cards);
+ const countCards=()=>{cardSummary.textContent=session?`选择镜头 · 已选 ${selected.length} / ${session.records.length}`:'镜头';};
+ view.append(heading,note,info,originalLabel,appearanceLabel,cardBox,generateTags,tags,generation,cancelButton,state,action('返回监控屏',()=>panel.dialog.close()));
  const receive=async e=>{
   const d=e.data;if(!d||!['meow-camera-open','meow-camera-list','meow-camera-view','meow-camera-redraw','meow-camera-delete'].includes(d.type)||typeof d.requestId!=='string'||d.requestId.length>100)return;
   const frame=[...document.querySelectorAll('#chat .mes[mesid] iframe')].find(f=>f.contentWindow===e.source);if(!frame)return;
@@ -90,8 +92,8 @@ export function mountCamera({root,context,chatKey,panel,page,secondary,run,isBus
    const draft=readDrafts()[cameraIdentity(s)],ids=new Set(records.map(r=>r.id));scenes=Array.isArray(draft?.scenes)?draft.scenes.filter(x=>ids.has(x.source_ids?.[0])):[];selected=[];renderTags();
    info.textContent=`副 API：${secondary.url||'尚未配置'} · ${secondary.model||'尚未配置模型'}`;
    for(const r of records){const label=node('label',''),check=document.createElement('input');check.type='checkbox';check.checked=draft?.selected?draft.selected.includes(r.id):Number.isInteger(d.index)?r.index===d.index:true;if(check.checked)selected.push(r.id);
-    check.addEventListener('change',()=>{selected=check.checked?[...selected,r.id]:selected.filter(id=>id!==r.id);scenes=[];tags.replaceChildren();remember();});label.append(check,node('strong',r.title),node('p',r.text));cards.append(label);}
-   state.textContent=scenes.length?'已恢复上次生成的镜头 tags，可直接点②生图，或重新生成。':'已捕捉住宅镜头，请确认要发送的记录。';panel.open();page('camera');panel.setMode('bad');
+    check.addEventListener('change',()=>{selected=check.checked?[...selected,r.id]:selected.filter(id=>id!==r.id);scenes=[];tags.replaceChildren();remember();countCards();});label.append(check,node('strong',r.title),node('p',r.text));cards.append(label);}
+   countCards();state.textContent=scenes.length?'已恢复上次生成的镜头 tags，可直接点②生图，或重新生成。':'已捕捉住宅镜头，请确认要发送的记录。';panel.open();page('camera');panel.setMode('bad');
   }catch(error){e.source.postMessage({type:'meow-camera-error',requestId:d.requestId,message:error.message},e.origin==='null'?'*':e.origin);}
  };
  window.addEventListener('message',receive);

@@ -11,7 +11,7 @@ export function validateCharacters(value){
 }
 export function characterParameters(value,model){
  const characters=validateCharacters(value);
- if(!/^nai-diffusion-4(?:-5)?-(?:full|curated|curated-preview)$/.test(model))throw new Error('角色参数目前支持已核对的 V4 / V4.5 模型，请在星绘页选择。');
+ if(!/^nai-diffusion-(?:4(?:-5)?|5)-(?:full|curated|curated-preview)(?:-inpainting)?$/.test(model))throw new Error('角色参数支持 V4 / V4.5 / V5 模型，请在星绘页选择。');
  const captions=negative=>characters.map(c=>({char_caption:negative?c.negative_prompt:c.prompt,centers:[{x:c.x,y:c.y}]}));
  return {v4_prompt:{caption:{char_captions:captions(false)},use_coords:true,use_order:true},v4_negative_prompt:{caption:{char_captions:captions(true)}}};
 }

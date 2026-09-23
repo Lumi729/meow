@@ -1,9 +1,10 @@
 /** Official NovelAI JSON transport, for parameters the ST bridge cannot forward. */
+import { responsePng } from './nai-tools.js';
 export function directRequest(payload, extraText='{}', model=''){
  let extra;try{extra=JSON.parse(extraText||'{}');}catch{throw new Error('高级参数必须是有效 JSON。');}
  if(!extra||typeof extra!=='object'||Array.isArray(extra))throw new Error('高级 parameters 必须是对象。');
  for(const key of ['__proto__','constructor','prototype','Authorization','token','api_key','url'])if(Object.hasOwn(extra,key))throw new Error(`高级参数不允许 ${key}。`);
- const params={params_version:3,width:payload.width,height:payload.height,steps:payload.steps,scale:payload.scale,seed:payload.seed,
+ const params={params_version:/^nai-diffusion-5/.test(model.trim()||payload.model)?4:3,width:payload.width,height:payload.height,steps:payload.steps,scale:payload.scale,seed:payload.seed,
   sampler:payload.sampler,noise_schedule:payload.scheduler,n_samples:1,negative_prompt:payload.negative_prompt,
   qualityToggle:false,ucPreset:0,sm:payload.sm,sm_dyn:payload.sm_dyn,dynamic_thresholding:payload.decrisper,
   deliberate_euler_ancestral_bug:false,prefer_brownian:true,
@@ -11,7 +12,7 @@ export function directRequest(payload, extraText='{}', model=''){
   v4_negative_prompt:{caption:{base_caption:payload.negative_prompt,char_captions:[]}},...extra};
  if(payload.upscale_ratio!==1)throw new Error('完整参数生图暂不支持后处理放大，请把放大倍数设为不放大。');
  const effectiveModel=model.trim()||payload.model;
- if(payload.variety_boost)params.skip_cfg_above_sigma=Math.sqrt(payload.width*payload.height/1011712)*(effectiveModel.includes('nai-diffusion-4-5')?58:19);
+ if(payload.variety_boost)params.skip_cfg_above_sigma=Math.sqrt(payload.width*payload.height/1011712)*(/nai-diffusion-(4-5|5)/.test(effectiveModel)?58:19);
  // The batch UI controls sample count; preserve fixed prompt composition in both caption formats.
  Object.assign(params,{dynamic_thresholding:!!payload.decrisper,sm:!!payload.sm,sm_dyn:!!payload.sm_dyn,cfg_rescale:payload.cfg_rescale??0,width:payload.width,height:payload.height,steps:payload.steps,scale:payload.scale,seed:payload.seed,sampler:payload.sampler,noise_schedule:payload.scheduler,n_samples:1,negative_prompt:payload.negative_prompt});
  for(const key of ['v4_prompt','v4_negative_prompt']){
@@ -25,8 +26,8 @@ export function directRequest(payload, extraText='{}', model=''){
 export async function requestDirect(body,token,signal,fetcher=fetch){
  if(!token)throw new Error('官网直连需要在本次页面中重新填写并保存 NovelAI Token；不会从服务器回读密钥。');
  let r;try{r=await fetcher('https://image.novelai.net/ai/generate-image',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),signal});}catch(e){if(e.name==='AbortError')throw e;throw new Error('官网直连失败：请检查网络或浏览器跨域限制。可切回酒馆通道使用基础参数。');}
- if(!r.ok)throw new Error(`NovelAI 返回 HTTP ${r.status}，请检查参数、密钥和余额。`);
- const raw=await r.json();const image=raw.images?.[0]?.image;
- if(typeof image!=='string'||!/^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(image))throw new Error('官网没有返回预期的 JSON PNG 图像。');
+ if(!r.ok){let detail='';try{detail=(await r.text()).slice(0,200);}catch{}throw new Error(`NovelAI 返回 HTTP ${r.status}${detail?`：${detail}`:''}。请检查参数、密钥和余额。`);}
+ const image=await responsePng(r);
+ if(!/^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(image))throw new Error('官网没有返回 PNG 图像。');
  return `data:image/png;base64,${image}`;
 }

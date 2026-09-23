@@ -16,3 +16,20 @@ export async function updateSelf(folder,headers,save,reload,fetcher=fetch){
  }catch(error){if(error.name==='AbortError')throw new Error('等待更新超时，服务器可能仍在更新；请稍后在扩展管理查看结果。');throw error;}
  finally{clearTimeout(timer);}
 }
+
+/** Asks the SillyTavern server (git fetch) whether a newer Meow exists; the version label comes from GitHub when reachable. */
+export async function checkUpdate(folder,headers,fetcher=fetch,manifestUrl='https://raw.githubusercontent.com/Lumi729/meow/main/manifest.json'){
+ if(!/^third-party\/[^/]+$/.test(folder))return {known:false};
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+ try{
+  const discovery=await fetcher('/api/extensions/discover',{headers,signal:controller.signal});
+  const entries=discovery.ok?await discovery.json():[];
+  const own=Array.isArray(entries)?entries.find(e=>e.name===folder):null;
+  const r=await fetcher('/api/extensions/version',{method:'POST',headers,signal:controller.signal,body:JSON.stringify({extensionName:folder.slice('third-party/'.length),global:own?.type==='global'})});
+  if(!r.ok)return {known:false};
+  const data=await r.json();if(typeof data.isUpToDate!=='boolean')return {known:false};
+  let latest='';if(!data.isUpToDate){try{const m=await fetcher(manifestUrl,{cache:'no-store',signal:controller.signal});if(m.ok)latest=String((await m.json()).version||'');}catch{}}
+  return {known:true,upToDate:data.isUpToDate,latest,commit:String(data.currentCommitHash||'').slice(0,7)};
+ }catch{return {known:false};}
+ finally{clearTimeout(timer);}
+}

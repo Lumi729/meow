@@ -121,3 +121,13 @@ export function sceneAnchor(scene,parts){
  if(originalAt<0)throw new Error('这段文字经过改写，无法定位到正文。');
  return {...source,anchorText:quote,anchorStart:base+originalAt};
 }
+
+export const REVERSE_PROMPT='看这张图，把画面写成 NovelAI 英文 tags：人数、人物外貌（发型发色、眼睛、服装、表情、动作、姿势）、构图与镜头、场景、光线、画风。只输出用英文逗号分隔的 tags，不要解释、不要编号、不要代码块。';
+/** Image → NovelAI tags through the user's OpenAI-compatible secondary API (vision model). */
+export function buildReverseRequest(config,image,instruction=''){
+    if(!config.model?.trim())throw new Error('请先在设置里填写副 API 模型。');
+    if(!/^data:image\/(png|jpeg|webp);base64,/.test(image))throw new Error('图片格式不支持。');
+    return {chat_completion_source:'custom',custom_url:apiBase(config.url),secret_id:config.secret_id,model:config.model.trim(),stream:false,temperature:0.4,max_tokens:1024,
+        messages:[{role:'system',content:instruction.trim()||REVERSE_PROMPT},{role:'user',content:[{type:'text',text:'这是要反推 tags 的图片。'},{type:'image_url',image_url:{url:image}}]}]};
+}
+export const cleanTags=text=>String(text??'').trim().replace(/^```\w*\s*/,'').replace(/\s*```$/,'').replace(/\n+/g,', ').replace(/\s*,\s*(,\s*)+/g,', ').trim();
