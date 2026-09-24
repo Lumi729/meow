@@ -31,7 +31,7 @@ export async function init(){
  ext.meow_secondary??={url:'',model:'',secret_id:'',preset:TAG_PRESET,context_count:5,image_count:1,rules:JSON.stringify(DEFAULT_RULES,null,2),output:'journal'};
  ext.meow_presets??=[];ext.meow_gallery_scope??=crypto.randomUUID();
  ext.meow_advanced??={transport:'bridge',model:'',parameters:'{}'};
- const advanced=ext.meow_advanced; const vault=tokenVault(ext.meow_gallery_scope);let directToken='';try{directToken=await vault.get();}catch{}
+ const advanced=ext.meow_advanced; const vault=tokenVault(ext.meow_gallery_scope);let directToken='',tokenStorageError='';if(ext.meow_remember_token!==false){try{directToken=await vault.get();}catch(e){tokenStorageError=e.message;}}
  const secondary=ext.meow_secondary,ui=ext.meow_ui;
  ui.normal_size??=ui.size||64;ui.bad_size??=ui.size||64;ui.top_image??='';
  const save=()=>ctx().saveSettingsDebounced();save();
@@ -63,11 +63,17 @@ export async function init(){
  on('preset-delete',()=>{const id=el('preset-list').value;if(!id)return;ext.meow_presets=ext.meow_presets.filter(p=>p.id!==id);if(ext.meow_last_preset===id){ext.meow_last_preset='';el('preset-name').value='';}presets();save();status('配置已删除。');});
  on('preset-export',()=>download('meow-preset.json',JSON.stringify({version:1,name:el('preset-name').value||'猫猫配置',settings:cleanPreset(config()),advanced:advancedPreset()},null,2)));
  on('preset-import',async()=>{const file=el('preset-import').files[0];if(!file)return;if(file.size>200000)throw new Error('配置文件太大。');const raw=JSON.parse(await file.text());Object.assign(settings,cleanPreset(raw));restoreAdvanced(raw.advanced);drawFields();el('preset-name').value=String(raw.name||'导入配置').slice(0,80);el('preset-import').value='';save();status('配置已导入，点击保存配置可加入列表。');},'change');
- const keyStatus=()=>{el('key-status').textContent=secret_state[SECRET_KEYS.NOVEL]?'已配置本地 NovelAI Token':'尚未配置 NovelAI Token';el('secondary-state').textContent=secondary.secret_id?'副 API 已绑定本地密钥 ID':'尚未绑定副 API 密钥';};keyStatus();
+ const keyStatus=()=>{el('key-status').textContent=(secret_state[SECRET_KEYS.NOVEL]?'酒馆服务器：已配置 NovelAI Token。':'酒馆服务器：尚未配置 NovelAI Token。')+(directToken?' 当前页面：直连 Token 可用。':' 当前页面：没有可用的直连 Token。')+(tokenStorageError?` 浏览器存储：${tokenStorageError}`:'');el('secondary-state').textContent=secondary.secret_id?'副 API 已绑定本地密钥 ID':'尚未绑定副 API 密钥';};keyStatus();
  ctx().eventSource.on(ctx().event_types.SECRET_WRITTEN,keyStatus);ctx().eventSource.on(ctx().event_types.SECRET_DELETED,keyStatus);
- on('save-token',async()=>{if(busy)throw new Error('请等待当前任务完成。');const value=el('token').value.trim();if(!value)throw new Error('请先填写 Token。');el('save-token').disabled=true;try{const id=await writeSecret(SECRET_KEYS.NOVEL,value,'Meow NovelAI');if(!id)throw new Error('Token 保存失败。');directToken=value;if(el('remember-token').checked)await vault.set(value);else await vault.clear();keyStatus();status('Token 已保存到本地酒馆。');}finally{el('token').value='';el('save-token').disabled=false;}});
- el('remember-token').checked=ext.meow_remember_token!==false;on('remember-token',async()=>{ext.meow_remember_token=el('remember-token').checked;if(!ext.meow_remember_token)await vault.clear();else if(directToken)await vault.set(directToken);save();},'change');
- on('forget-token',async()=>{directToken='';await vault.clear();status('已清除本浏览器的直连 Token；酒馆服务器保存的密钥仍保留。');});
+ const rememberToken=async()=>{try{await saveSettings();await vault.set(directToken);tokenStorageError='';}catch(e){tokenStorageError=e.message;throw e;}finally{keyStatus();}};
+ on('save-token',async()=>{if(busy)throw new Error('请等待当前任务完成。');const value=el('token').value.trim();if(!value)throw new Error('请先填写 Token。');el('save-token').disabled=true;try{
+  directToken=value;
+  const id=await writeSecret(SECRET_KEYS.NOVEL,value,'Meow NovelAI');
+  if(el('remember-token').checked)await rememberToken();else await vault.clear();
+  keyStatus();status(id?(el('remember-token').checked?'NovelAI Token 已保存到酒馆和本浏览器，并通过浏览器读回校验。':'NovelAI Token 已保存到酒馆；浏览器记忆已关闭，直连仅本次页面可用。'):'浏览器直连 Token 可用，但酒馆服务器保存失败，请检查酒馆连接。');
+ }finally{el('token').value='';el('save-token').disabled=false;keyStatus();}});
+ el('remember-token').checked=ext.meow_remember_token!==false;on('remember-token',async()=>{ext.meow_remember_token=el('remember-token').checked;await saveSettings();if(!ext.meow_remember_token)await vault.clear();else if(directToken)await rememberToken();keyStatus();},'change');
+ on('forget-token',async()=>{await vault.clear();directToken='';tokenStorageError='';keyStatus();status('已清除本浏览器的直连 Token；酒馆服务器保存的密钥仍保留。');});
  const fields=[['secondary-url','url'],['secondary-model','model'],['tag-preset','preset'],['context-count','context_count'],['image-count','image_count'],['rules','rules'],['output','output']];
  el('character-mode').checked=!!secondary.character_mode;on('character-mode',()=>{secondary.character_mode=el('character-mode').checked;save();selectionPreview();},'change');
  const destination=()=>{let url;try{url=apiBase(secondary.url);}catch{url='尚未配置副 API 地址';}el('destination').textContent=`发送目标：${url} · 模型：${secondary.model||'未填写'}`;};
@@ -162,7 +168,16 @@ export async function init(){
  let lastTiming=null;
  const seconds=ms=>(ms/1000).toFixed(1);
  const timing=message=>{el('generation-timing').textContent=message;};
- const getToken=async()=>{if(!directToken){directToken=await findSecret(SECRET_KEYS.NOVEL)||'';if(directToken&&el('remember-token').checked)await vault.set(directToken);}if(!directToken){document.querySelector('[data-page="config"]').click();el('token').focus();throw new Error('这些参数或官网功能需要直连 NovelAI。请在设置里填写并保存 NovelAI Token，然后回去点生成。');}return directToken;};
+ const getToken=async()=>{
+  if(!directToken&&el('remember-token').checked){try{directToken=await vault.get();tokenStorageError='';}catch(e){tokenStorageError=e.message;}}
+  if(!directToken&&typeof secretsModule.canViewSecrets==='function'&&await secretsModule.canViewSecrets()){
+   directToken=await findSecret(SECRET_KEYS.NOVEL)||'';
+   if(directToken&&el('remember-token').checked){try{await rememberToken();}catch{/* Keep the usable in-memory token; status shows the persistence error. */}}
+  }
+  keyStatus();
+  if(!directToken){page('config');el('token').focus();throw new Error('浏览器没有可用的 NovelAI 直连 Token。酒馆已保存的密钥不一定允许浏览器读取；请填写一次并保存，确认显示浏览器读回校验成功。'+(tokenStorageError?` ${tokenStorageError}`:''));}
+  return directToken;
+ };
  const png=async(payload,signal)=>{
  if(payload.direct)await getToken();
  if(!payload.direct&&!secret_state[SECRET_KEYS.NOVEL])throw new Error('请先在设置里配置 NovelAI Token。');
