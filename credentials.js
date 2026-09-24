@@ -34,7 +34,7 @@ export function tokenVault(scope){
    await access('readwrite',value);
    if(await access('readonly')!==value)throw new Error('凭证读回校验失败');
    // If the backup exists but failed to update, it must not mask the new value.
-   if(!localSaved){try{const stale=localStorage.getItem(key);if(stale!==null&&stale!==value){localStorage.removeItem(key);if(localStorage.getItem(key)!==null)throw new Error();}}catch{throw new Error('备用凭证未能更新');}}
+   if(!localSaved){let stale=null;try{stale=localStorage.getItem(key);}catch{/* IndexedDB alone is sufficient when backup storage cannot be read. */}if(stale!==null&&stale!==value){localStorage.removeItem(key);if(localStorage.getItem(key)!==null)throw new Error('备用凭证未能更新');}}
   }catch{if(!localSaved)throw new Error('浏览器未能保存直连 Token：请检查网站存储权限；当前页面仍可使用，重新打开后需再填写。');}
  };
  return {get,set,clear:()=>set('')};

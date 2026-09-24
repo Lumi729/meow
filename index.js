@@ -5,6 +5,8 @@ import { mountInline, migrateLegacy, bindSwipe, stripInline } from './inline.js'
 import { mountExcerptBridge } from './excerpt-bridge.js';
 import { mountGift } from './gift.js';
 import { saveSettings } from '../../../../script.js';
+import * as scriptModule from '../../../../script.js';
+import { mountRecovery } from './recovery.js';
 import { updateSelf, checkUpdate } from './updater.js';
 import { mountTools } from './tools-ui.js';
 import { foldAll, foldHints } from './fold.js';
@@ -206,7 +208,18 @@ export async function init(){
  };
 
  const makeEntry=(src,payload,source=[],title='星绘',key=chatKey())=>({id:crypto.randomUUID(),created:Date.now(),src,payload:structuredClone(payload),source:structuredClone(source),title,chatKey:key,bad:source.length>0});
- on('generate',()=>run(async signal=>{const payload=prepare(config()),key=chatKey();await tools.withTools(payload,signal,{parameters:advanced.parameters,model:advanced.model});status('猫猫正在画画…');const src=await png(payload,signal);const title={img2img:'图生图',infill:'局部重绘'}[payload.direct?.action]||'星绘';const entry=makeEntry(src,payload,[],title,key);await addImage(entry);if(!entry.unsaved)status('图片已保存到图库。');}));
+ el('draw-count').value=ext.meow_draw_count||1;
+ on('draw-count',()=>{ext.meow_draw_count=numberIn(el('draw-count').value,1,20,'图片数');save();},'change');
+ on('generate',()=>run(async signal=>{
+  const count=numberIn(el('draw-count').value,1,20,'图片数'),base=config(),key=chatKey();let completed=0;
+  for(let i=0;i<count;i++){
+   if(stopping||signal.aborted)break;
+   if(key!==chatKey())throw new Error('聊天已切换，已停止后续图片；完成的图片保留在图库。');
+   const payload=prepare(base);await tools.withTools(payload,signal,{parameters:advanced.parameters,model:advanced.model});status(`猫猫正在画第 ${i+1}/${count} 张…`);
+   const src=await png(payload,signal);const title={img2img:'图生图',infill:'局部重绘'}[payload.direct?.action]||'星绘';const entry=makeEntry(src,payload,[],count>1?`${title} ${i+1}/${count}`:title,key);await addImage(entry);completed++;if(entry.unsaved)return;
+  }
+  status(`已完成 ${completed}/${count} 张，图片已保存到图库。`);
+ }));
  const previewIds=ext.meow_preview??={};let viewerOrigin=null;
  const previewList=mode=>images.filter(x=>mode==='bad'?x.bad&&x.chatKey===chatKey():!x.bad);
  function movePreview(mode,delta){const list=previewList(mode);if(!list.length)return;const i=list.findIndex(x=>x.id===previewIds[mode]);previewIds[mode]=list[(Math.max(0,i)+delta+list.length)%list.length].id;renderPreviews();save();}
@@ -253,7 +266,7 @@ export async function init(){
  el('scenes').addEventListener('input',saveDraft);el('scenes').addEventListener('change',saveDraft);
  function renderParts(){el('context-box').open=false;el('context-list').replaceChildren();for(const p of parts){const card=textNode('div','','meow-source');const label=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=p.selected;input.addEventListener('change',()=>{p.selected=input.checked;selectionPreview();});label.append(input,document.createTextNode(`${p.name} · 第 ${p.messageIndex+1} 条 · ${p.part}`));const body=document.createElement('textarea');body.value=p.text;body.rows=4;body.setAttribute('aria-label',`${p.id} 待发送原文`);const originalAnchor=p.originalAnchor??=p.anchorText,originalStart=p.originalStart??=p.anchorStart;body.addEventListener('input',()=>{p.text=body.value;const chosen=p.text.trim(),at=originalAnchor.indexOf(chosen);if(chosen&&at>=0&&originalAnchor.indexOf(chosen,at+1)<0){p.anchorText=chosen;p.anchorStart=originalStart+at;}else{p.anchorText=originalAnchor;p.anchorStart=originalStart;}selectionPreview();});card.append(label,body);el('context-list').append(card);}}
  on('capture',()=>{if(!ctx().getCurrentChatId())throw new Error('请先打开一个聊天。');const count=numberIn(secondary.context_count,1,50,'上下文条数');let rules;try{rules=JSON.parse(secondary.rules);}catch{throw new Error('分区规则不是有效 JSON。');}if(!Array.isArray(rules)||rules.length>20||rules.some(r=>typeof r.name!=='string'||typeof r.start!=='string'||typeof r.end!=='string'))throw new Error('每条规则需要 name、start 和 end，最多 20 条。');parts=captureContext(ctx().chat,captureTarget===null?count:ctx().chat.length,rules);if(captureTarget!==null){parts=parts.filter(p=>p.messageIndex===captureTarget);captureTarget=null;}capture={key:chatKey()};renderParts();selectionPreview();status(parts.length?'已捕捉。请勾选要发送的部分；可在框内删去不想发送的文字。':'没有可用原文。');});
- const runTags=async(signal,countOverride)=>{const typed=el('send-preview').value.trim(),manual=manualPreview&&!!typed;if(manual)capture={key:chatKey()};else if(!capture)throw new Error('请先点①捕捉聊天，或直接在「将发送的原文预览」里写内容。');checkChat();if(!secondary.secret_id)throw new Error('请先配置副 API 密钥。');const count=numberIn(countOverride??secondary.image_count,1,8,'图片数');const withCharacters=!!secondary.character_mode;
+ const runTags=async(signal,countOverride)=>{const typed=el('send-preview').value.trim(),manual=manualPreview&&!!typed;if(manual)capture={key:chatKey()};else if(!capture)throw new Error('请先点①捕捉聊天，或直接在「将发送的原文预览」里写内容。');checkChat();if(!secondary.secret_id)throw new Error('请先配置副 API 密钥。');const count=numberIn(countOverride??secondary.image_count,1,20,'图片数');const withCharacters=!!secondary.character_mode;
  const chosen=manual?[{id:'manual',messageIndex:null,name:'手写',part:'预览框内容',text:typed}]:structuredClone(selected());const request=buildTagRequest({...secondary,appearance:await getAppearance()},chosen,count);if(JSON.stringify(request).length>150000)throw new Error('选中上下文太长，请减少条数或删减内容（最多 150 KB）。');status('正在把勾选原文发给副 API…');const timeout=setTimeout(()=>controller?.abort(),120000);let data;try{const r=await fetch('/api/backends/chat-completions/generate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify(request),signal});if(!r.ok)throw new Error(`副 API 失败（HTTP ${r.status}），请检查地址、密钥和模型。`);data=await r.json();}finally{clearTimeout(timeout);}const raw=data.choices?.[0]?.message?.content;if(data.choices?.[0]?.finish_reason==='length'){el('raw-tags').value=typeof raw==='string'?raw:'';throw new Error('副 API 输出被截断，JSON 不完整。请减少本轮图片数或缩短预设要求后重试。');}if(typeof raw!=='string')throw new Error('副 API 返回缺少 choices[0].message.content。');el('raw-tags').value=raw;checkChat();scenes=parseScenes(raw,chosen.map(p=>p.id),count,withCharacters).map(s=>({...s,source:chosen.filter(p=>s.source_ids.includes(p.id))}));renderScenes();saveDraft();status(manual?'tags 已返回。预览框手写内容生成的图会放进图文相册，不插入正文。':'tags 已返回，检查或修改后再点生成图片。');};
  on('tags',()=>run(signal=>runTags(signal)));
  function renderScenes(){el('scenes').replaceChildren();scenes.forEach((s,i)=>{const box=textNode('div','','meow-scene');box.append(textNode('h4',`${i+1}. ${s.title}`));const positive=document.createElement('textarea');positive.value=s.prompt;positive.rows=4;positive.setAttribute('aria-label',`第 ${i+1} 幅 tags`);positive.addEventListener('input',()=>s.prompt=positive.value);const negative=document.createElement('textarea');negative.value=s.negative_prompt;negative.rows=2;negative.setAttribute('aria-label',`第 ${i+1} 幅补充负面`);negative.addEventListener('input',()=>s.negative_prompt=negative.value);box.append(positive,negative,textNode('small',`引用原文：${s.source_ids.join(', ')}`));const linked=s.source.some(p=>Number.isInteger(p.messageIndex));const anchorLabel=textNode('label','插图跟在哪一句后（逐字原文）');const anchorInput=document.createElement('textarea');anchorInput.value=s.anchor_quote;anchorInput.rows=2;anchorInput.addEventListener('input',()=>s.anchor_quote=anchorInput.value);const anchorSelect=document.createElement('select');s.source.forEach(p=>anchorSelect.add(new Option(p.id+' · '+p.part,p.id)));anchorSelect.value=s.anchor_source_id||s.source_ids[0];s.anchor_source_id=anchorSelect.value;anchorSelect.addEventListener('change',()=>s.anchor_source_id=anchorSelect.value);anchorLabel.append(anchorSelect,anchorInput);if(linked)box.append(anchorLabel);if(s.characters){
@@ -289,7 +302,7 @@ export async function init(){
   pick.replaceChildren();
   const title=textNode('h3','ฅ 把这段画出来'),quote=textNode('pre',text.length>300?`${text.slice(0,300)}…`:text);
   const where=textNode('label','生成后放在哪里'),select=document.createElement('select');select.add(new Option('只放进图库（坏猫猫图文相册）','journal'));const insertOpt=new Option(linked?'图库 + 插入原文这句后面':'图库 + 插入原文（这段在原文里找不到，不能插入）','chat');insertOpt.disabled=!linked;select.add(insertOpt);select.value=linked&&secondary.output==='chat'?'chat':'journal';where.append(select);
-  const countLabel=textNode('label','画几张'),count=document.createElement('input');count.type='number';count.min=1;count.max=8;count.value=1;countLabel.append(count);
+  const countLabel=textNode('label','画几张'),count=document.createElement('input');count.type='number';count.min=1;count.max=20;count.value=1;countLabel.append(count);
   const row=textNode('div','','meow-row'),go=textNode('button','开始：生成 tags 再画图'),cancel=textNode('button','取消');go.type=cancel.type='button';row.append(go,cancel);
   pick.append(title,quote,where,countLabel,row,textNode('small','会先把这段发给副 API 写 tags，写好直接用当前绘图配置生图。'));
   const choice=await new Promise(resolve=>{go.onclick=()=>resolve({output:select.value,count:Number(count.value)||1});cancel.onclick=()=>resolve(null);pick.onclose=()=>resolve(null);pick.showModal();});
@@ -320,6 +333,7 @@ export async function init(){
  root.querySelector('[data-page="config"]').addEventListener('click',()=>updateCheck().catch(()=>{}));
  on('check-update',()=>updateCheck(true));
  const gift=mountGift({root,ext,save});new (window.MutationObserver)(()=>{if(panel.dialog.open)gift.firstOpen();}).observe(panel.dialog,{attributes:true,attributeFilter:['open']});if(panel.dialog.open)gift.firstOpen();
+ mountRecovery({root,context:ctx,isBusy:()=>busy||modelsLoading,isGenerating:scriptModule.isGenerating,save});
  loadDraft();
  try{images=await store.list();renderGallery();renderPreviews();}catch{status('当前浏览器无法打开图库存储，生成后请及时下载。');}
 }

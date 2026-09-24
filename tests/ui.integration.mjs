@@ -21,7 +21,7 @@ window.document.body.innerHTML='<div id="top-settings-holder"></div><div id="ext
 let src=await fs.readFile(root+'index.js','utf8');
 const secretMock='export const SECRET_KEYS={NOVEL:"novel",CUSTOM:"custom"}; export const secret_state={novel:true};export async function findSecret(){return null};export async function writeSecret(){return "mock-id"}';
 const utilsMock='export async function saveBase64AsFile(){return "/user/images/test.png"}';
-src=src.replace("'../../../../script.js'",JSON.stringify('data:text/javascript,export async function saveSettings(){}'));
+src=src.replaceAll("'../../../../script.js'",JSON.stringify('data:text/javascript,export async function saveSettings(){};export function isGenerating(){return false}'));
 src=src.replaceAll("'../../../secrets.js'",JSON.stringify('data:text/javascript,'+encodeURIComponent(secretMock))).replace("'../../../utils.js'",JSON.stringify('data:text/javascript,'+encodeURIComponent(utilsMock)));
 src=src.replace(/from '(\.\/[^']+)'/g,(_,p)=>'from '+JSON.stringify(pathToFileURL(root+p.slice(2)).href));
 src=src.replace(/const folder=.*?;/, "const folder='third-party/meow';");
@@ -168,6 +168,10 @@ document.querySelector('[data-page="gallery"]').click();$('gallery-filter').valu
 [...$('gallery').querySelectorAll('button')].find(b=>b.querySelector('img')?.alt===withScene.title&&b.querySelector('img').src===withScene.src)?.click()??$('gallery').querySelector('button').click();await settle();
 [...$('viewer').querySelectorAll('button')].find(b=>b.textContent.startsWith('重绘')).click();await settle();
 const sentPrompt=redrawBody.input??redrawBody.prompt;assert.ok(sentPrompt.startsWith('ink style'),sentPrompt);assert.ok(sentPrompt.includes(withScene.scene.prompt),sentPrompt);
+// Star drawing batches stay sequential and honor Stop before the next image.
+let batchCalls=0;globalThis.fetch=async()=>{batchCalls++;if(batchCalls===2)click('stop');return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
+field('draw-count','20');field('prompt','cat');click('generate');await settle();await settle();assert.equal(batchCalls,2);assert.equal($('generate').disabled,false);
+field('draw-count','1');assert.equal($('image-count').max,'20');
 // Reinitializing the UI must restore the remembered token without server key exposure.
 window.document.body.innerHTML='<div id="top-settings-holder"></div><div id="extensionsMenu"></div><div id="extensions_settings2"></div>';
 await module.init();

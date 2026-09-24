@@ -22,3 +22,9 @@ test('failure of both stores reports persistence failure without exposing token'
  try{await assert.rejects(tokenVault('blocked').set('do-not-echo'),e=>!e.message.includes('do-not-echo')&&e.message.includes('未能保存'));await assert.rejects(tokenVault('blocked').get());}
  finally{globalThis.localStorage=storage;globalThis.indexedDB=indexedDB;}
 });
+
+test('IndexedDB remains usable when backup localStorage is unavailable',async()=>{
+ const storage=globalThis.localStorage;globalThis.localStorage={getItem(){throw Error();},setItem(){throw Error();}};
+ try{await tokenVault('idb-only').set('test-idb-only');assert.equal(await tokenVault('idb-only').get(),'test-idb-only');await tokenVault('idb-only').clear();assert.equal(await tokenVault('idb-only').get(),'');}
+ finally{globalThis.localStorage=storage;}
+});
