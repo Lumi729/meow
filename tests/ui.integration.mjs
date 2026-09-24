@@ -168,5 +168,14 @@ document.querySelector('[data-page="gallery"]').click();$('gallery-filter').valu
 [...$('gallery').querySelectorAll('button')].find(b=>b.querySelector('img')?.alt===withScene.title&&b.querySelector('img').src===withScene.src)?.click()??$('gallery').querySelector('button').click();await settle();
 [...$('viewer').querySelectorAll('button')].find(b=>b.textContent.startsWith('重绘')).click();await settle();
 const sentPrompt=redrawBody.input??redrawBody.prompt;assert.ok(sentPrompt.startsWith('ink style'),sentPrompt);assert.ok(sentPrompt.includes(withScene.scene.prompt),sentPrompt);
+// Reinitializing the UI must restore the remembered token without server key exposure.
+window.document.body.innerHTML='<div id="top-settings-holder"></div><div id="extensionsMenu"></div><div id="extensions_settings2"></div>';
+await module.init();
+assert.match($('key-status').textContent,/直连 Token 可用/);
+let restoredAuth='';globalThis.fetch=async(url,options)=>{assert.ok(String(url).startsWith('https://image.novelai.net/'));restoredAuth=options.headers.Authorization;return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
+field('transport','direct');field('prompt','cat');click('generate');await settle();
+assert.equal(restoredAuth,'Bearer test-only');
+click('forget-token');await settle();assert.match($('key-status').textContent,/没有可用的直连 Token/);
+restoredAuth='';click('generate');await settle();assert.equal(restoredAuth,'');assert.match($('status').textContent,/浏览器没有可用/);
 console.log('UI integration: entries, persistent dialog, presets, selected-only context, tags, NAI composition, gallery with source, stale-chat guard passed.');process.exit(0);
 await window.happyDOM.abort();
