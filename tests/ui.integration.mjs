@@ -161,6 +161,8 @@ click('theme-delete');await settle();assert.equal(extensionSettings.meow_themes.
 assert.equal(extensionSettings.meow_theme.css,'#meow-panel{background:#fff}');
 $('theme-css').value='</style><script>';click('theme-apply');await settle();assert.equal(extensionSettings.meow_theme.css,'#meow-panel{background:#fff}');
 click('theme-reset');await settle();assert.equal(document.getElementById('meow-theme-style').textContent,'');assert.equal(extensionSettings.meow_themes.length,1);
+context.chat[0].mes='<正文>她穿着礼服。white cat</正文>';
+field('tag-preset','测试坏猫猫预设');
 // 书摘 bridge: a "画图" button joins the selection bar; the selected sentence goes to tags and then to a picture.
 current='chat-a';await events.chat();
 const chatBox=document.createElement('div');chatBox.id='chat';chatBox.innerHTML='<div class="mes" mesid="0"><div class="mes_text"><p>white cat</p></div></div>';document.body.append(chatBox);
@@ -171,6 +173,9 @@ let selBodies=[];globalThis.fetch=async(url,options)=>{const b=JSON.parse(option
 meowBtn.click();await settle();const selDialog=document.getElementById('meow-selection-dialog');assert.ok(selDialog.open);assert.match(selDialog.textContent,/white cat/);assert.ok(!selDialog.querySelector('option[value=chat]').disabled);
 [...selDialog.querySelectorAll('button')].find(b=>b.textContent.startsWith('开始')).click();await settle();await settle();
 assert.ok(selBodies.some(x=>x.url.includes('chat-completions')&&JSON.stringify(x.b).includes('white cat')));assert.ok(!fbar.classList.contains('show'));
+const excerptRequest=selBodies.find(x=>x.url.includes('chat-completions')).b;
+assert.match(excerptRequest.messages[0].content,/测试坏猫猫预设/);assert.match(excerptRequest.messages[0].content,/优先于人物档案/);
+const excerptData=JSON.parse(excerptRequest.messages[1].content);assert.match(excerptData.original_context,/她穿着礼服/);assert.equal(excerptData.passages[0].text,'white cat');
 const selEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.source[0]?.id==='m0sel');assert.ok(selEntry);assert.equal(selEntry.insertionSource.anchorText,'white cat');
 // Gift for 梨梨: welcome card once, letter after five taps on the title.
 assert.ok(document.getElementById('meow-gift-welcome').textContent.includes('世界为梨梨诞生'));document.getElementById('meow-gift-welcome').close();assert.equal(extensionSettings.meow_gift_seen,true);
