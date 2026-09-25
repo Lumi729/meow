@@ -132,16 +132,37 @@ export async function init(){
 `;
  const themeStyle=document.getElementById('meow-theme-style')||Object.assign(document.createElement('style'),{id:'meow-theme-style'});document.head.append(themeStyle);
  const cleanCss=css=>{css=String(css??'');if(css.length>500000)throw new Error('CSS 太大（上限 500 KB）。');if(/<\/?style|<script/i.test(css))throw new Error('CSS 里不能有 <style> 或 <script> 标签。');return css;};
- const applyTheme=()=>{themeStyle.textContent=ext.meow_theme.css||'';el('theme-title').value=ext.meow_theme.name||'';el('theme-css').value=ext.meow_theme.css||'';el('theme-state').textContent=ext.meow_theme.css?`当前美化：${ext.meow_theme.name||'未命名'}`:'当前是默认样式';};
- const setTheme=(name,css)=>{ext.meow_theme={name:String(name||'').slice(0,80),css:cleanCss(css)};save();applyTheme();};
+ // Migrate the existing theme once; deleting a preset must not recreate it on reload.
+ if(!Array.isArray(ext.meow_themes)){ext.meow_themes=ext.meow_theme.css?[{id:crypto.randomUUID(),name:ext.meow_theme.name||'原来的美化',css:ext.meow_theme.css}]:[];save();}
+ const renderThemes=()=>{
+  const select=el('theme-select');select.replaceChildren(new Option('选择已保存的美化',''));
+  for(const t of ext.meow_themes)select.add(new Option(t.name,t.id));
+  select.value=ext.meow_theme_id||'';el('theme-delete').disabled=!select.value;
+ };
+ const applyTheme=()=>{themeStyle.textContent=ext.meow_theme.css||'';el('theme-title').value=ext.meow_theme.name||'';el('theme-css').value=ext.meow_theme.css||'';el('theme-state').textContent=ext.meow_theme.css?`当前美化：${ext.meow_theme.name||'未命名'}`:'当前是默认样式';renderThemes();};
+ const setTheme=(name,css,id='')=>{ext.meow_theme={name:String(name||'').slice(0,80),css:cleanCss(css)};ext.meow_theme_id=id;save();applyTheme();};
+ const keepTheme=(name,css,imported=false)=>{
+  name=String(name||'').trim().slice(0,80);css=cleanCss(css);
+  if(!name)throw new Error('请先填写美化名字。');
+  let existing=ext.meow_themes.find(t=>t.name===name);
+  if(imported&&existing){const base=name;let n=2;while(ext.meow_themes.some(t=>t.name===name))name=`${base.slice(0,70)} (${n++})`;existing=null;}
+  if(existing&&!confirm(`已保存“${name}”，要覆盖它吗？`))return false;
+  const theme={id:existing?.id||crypto.randomUUID(),name,css};
+  if(existing)ext.meow_themes[ext.meow_themes.indexOf(existing)]=theme;else ext.meow_themes.push(theme);
+  setTheme(name,css,theme.id);return true;
+ };
+ const discardThemeDraft=()=>el('theme-title').value===(ext.meow_theme.name||'')&&el('theme-css').value===(ext.meow_theme.css||'')||confirm('编辑框中有尚未应用或保存的修改，确定放弃这些修改吗？');
  applyTheme();
- on('theme-apply',()=>{setTheme(el('theme-title').value.trim(),el('theme-css').value);status('美化已应用。');});
+ on('theme-save',()=>{if(keepTheme(el('theme-title').value,el('theme-css').value))status('美化已保存并应用，下次可直接选择。');});
+ on('theme-select',()=>{const t=ext.meow_themes.find(t=>t.id===el('theme-select').value);if(!t||!discardThemeDraft()){renderThemes();return;}setTheme(t.name,t.css,t.id);status(`已切换美化：${t.name}`);},'change');
+ on('theme-delete',()=>{const id=el('theme-select').value,t=ext.meow_themes.find(t=>t.id===id);if(!t||!confirm(`删除已保存的“${t.name}”？当前外观会保留。`))return;ext.meow_themes=ext.meow_themes.filter(t=>t.id!==id);ext.meow_theme_id='';save();renderThemes();status('已删除收藏，当前外观保留。');});
+ on('theme-apply',()=>{setTheme(el('theme-title').value.trim(),el('theme-css').value);status('美化已应用；点击“保存美化”可加入选择列表。');});
  on('theme-sample',()=>{if(el('theme-css').value.trim()&&!confirm('把选择器示例加到现在的 CSS 后面？'))return;el('theme-css').value=`${el('theme-css').value.trim()?`${el('theme-css').value.trim()}\n\n`:''}${THEME_SAMPLE}`;status('示例已填入，改好后点“应用 CSS”。');});
- on('theme-reset',()=>{if(!confirm('恢复默认样式？当前美化会被清空（建议先导出）。'))return;setTheme('','');status('已恢复默认样式。');});
+ on('theme-reset',()=>{if(!confirm('恢复默认样式？已保存的美化仍会保留。'))return;setTheme('','');status('已恢复默认样式。');});
  on('theme-export',()=>{const name=el('theme-title').value.trim()||ext.meow_theme.name||'猫猫星绘美化';download(`${name}.json`,JSON.stringify({name,css:el('theme-css').value},null,2));});
  on('theme-import',async()=>{const f=el('theme-import').files[0];if(!f)return;if(f.size>600000)throw new Error('美化文件太大（上限 500 KB）。');const text=await f.text();let name=f.name.replace(/\.[^.]+$/,''),css=text;
   if(/\.json$/i.test(f.name)){let raw;try{raw=JSON.parse(text);}catch{throw new Error('美化文件不是有效的 JSON。');}if(!raw||typeof raw.css!=='string')throw new Error('美化文件里要有 css 字段：{"name":"名字","css":"…"}');name=typeof raw.name==='string'&&raw.name.trim()?raw.name.trim():name;css=raw.css;}
-  setTheme(name,css);el('theme-import').value='';status(`已导入并应用美化：${name}`);},'change');
+  keepTheme(name,css,true);el('theme-import').value='';status(`已导入、保存并应用美化：${ext.meow_theme.name}`);},'change');
  on('launcher-reset',()=>{panel.reset();launcherValues();status('已恢复小动物手机和爱字图片，悬浮按钮回到右侧。');});
  ext.meow_people??={};ext.meow_cast_profiles??={};
  const archive=ext.meow_people;

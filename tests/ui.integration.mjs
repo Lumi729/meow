@@ -143,8 +143,24 @@ const dot=document.querySelector('#meow-panel .meow-hint-dot');assert.ok(documen
 field('reverse-prompt','my reverse rules');assert.equal(extensionSettings.meow_secondary.reverse_prompt,'my reverse rules');click('reverse-default');await settle();assert.notEqual($('reverse-prompt').value,'my reverse rules');
 // Global theme {name, css} applies immediately and survives in settings.
 field('theme-title','黑白画室');$('theme-css').value='#meow-panel{background:#fff}';click('theme-apply');await settle();assert.equal(document.getElementById('meow-theme-style').textContent,'#meow-panel{background:#fff}');assert.equal(extensionSettings.meow_theme.name,'黑白画室');
+click('theme-save');await settle();
+assert.equal(extensionSettings.meow_themes.length,1);
+const firstTheme=extensionSettings.meow_themes[0].id;
+field('theme-title','第二套');$('theme-css').value='#meow-panel{color:pink}';click('theme-save');await settle();
+assert.equal(extensionSettings.meow_themes.length,2);
+$('theme-select').value=firstTheme;$('theme-select').dispatchEvent(new Event('change',{bubbles:true}));await settle();
+assert.equal(extensionSettings.meow_theme.name,'黑白画室');
+globalThis.confirm=()=>false;
+$('theme-css').value='#meow-panel{color:red}';click('theme-save');await settle();
+assert.equal(extensionSettings.meow_themes[0].css,'#meow-panel{background:#fff}');
+globalThis.confirm=()=>true;
+click('theme-save');await settle();assert.equal(extensionSettings.meow_themes.length,2);
+assert.equal(extensionSettings.meow_themes[0].css,'#meow-panel{color:red}');
+$('theme-css').value='#meow-panel{background:#fff}';click('theme-save');await settle();
+click('theme-delete');await settle();assert.equal(extensionSettings.meow_themes.length,1);
+assert.equal(extensionSettings.meow_theme.css,'#meow-panel{background:#fff}');
 $('theme-css').value='</style><script>';click('theme-apply');await settle();assert.equal(extensionSettings.meow_theme.css,'#meow-panel{background:#fff}');
-click('theme-reset');await settle();assert.equal(document.getElementById('meow-theme-style').textContent,'');
+click('theme-reset');await settle();assert.equal(document.getElementById('meow-theme-style').textContent,'');assert.equal(extensionSettings.meow_themes.length,1);
 // 书摘 bridge: a "画图" button joins the selection bar; the selected sentence goes to tags and then to a picture.
 current='chat-a';await events.chat();
 const chatBox=document.createElement('div');chatBox.id='chat';chatBox.innerHTML='<div class="mes" mesid="0"><div class="mes_text"><p>white cat</p></div></div>';document.body.append(chatBox);
@@ -175,6 +191,7 @@ field('draw-count','1');assert.equal($('image-count').max,'20');
 // Reinitializing the UI must restore the remembered token without server key exposure.
 window.document.body.innerHTML='<div id="top-settings-holder"></div><div id="extensionsMenu"></div><div id="extensions_settings2"></div>';
 await module.init();
+assert.equal($('theme-select').options.length,2);assert.equal(extensionSettings.meow_themes[0].name,'第二套');
 assert.match($('key-status').textContent,/直连 Token 可用/);
 let restoredAuth='';globalThis.fetch=async(url,options)=>{assert.ok(String(url).startsWith('https://image.novelai.net/'));restoredAuth=options.headers.Authorization;return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
 field('transport','direct');field('prompt','cat');click('generate');await settle();
