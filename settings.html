@@ -26,24 +26,28 @@
   <section data-view="tools" hidden>
    <h3>✦ 官网功能 <span id="meow-tools-badge-page"></span></h3>
    <small>这些功能直连 NovelAI 官网：需要在设置里保存 Token，按官网规则消耗 Anlas。图库大图里点「用这张图…」可以直接把图带过来。</small>
-   <h4 id="meow-sec-base">基础图</h4>
+   <details class="meow-tools meow-config-group" id="meow-sec-base"><summary>基础图</summary><div class="meow-config-body">
    <label>模式<select id="meow-tool-mode"><option value="generate">不用基础图（文生图）</option><option value="img2img">图生图</option><option value="inpaint">局部重绘</option></select></label>
    <div class="meow-pick"><label class="meow-file">从相册选基础图<input id="meow-tool-image-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="base">从猫猫图库选</button></div>
    <div id="meow-tool-preview" class="meow-tool-preview"></div>
    <div class="meow-grid"><label>重绘强度（0.01–0.99）<input id="meow-tool-strength" type="number" min="0.01" max="0.99" step="0.01"></label><label>噪声（图生图，0–0.99）<input id="meow-tool-noise" type="number" min="0" max="0.99" step="0.01"></label></div>
    <label><input id="meow-tool-original" type="checkbox" checked>局部重绘时叠加原图（没涂的地方保持原样）</label>
    <div class="meow-row"><button id="meow-tool-mask" type="button">画蒙版</button><button id="meow-tool-size" type="button">尺寸跟随基础图</button><button id="meow-tool-clear" type="button">移除基础图</button></div>
-   <h4 id="meow-sec-vibe">氛围迁移 · Vibe Transfer</h4>
+   </div></details>
+<details class="meow-tools meow-config-group" id="meow-sec-vibe"><summary>氛围迁移 · Vibe Transfer</summary><div class="meow-config-body">
    <div class="meow-pick"><label class="meow-file">从相册添加氛围参考图<input id="meow-vibe-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="vibe">从猫猫图库选</button></div><div id="meow-vibe-list"></div>
-   <h4 id="meow-sec-vibelib">氛围库</h4>
+   </div></details>
+<details class="meow-tools meow-config-group" id="meow-sec-vibelib"><summary>氛围库</summary><div class="meow-config-body">
    <div class="meow-pick"><label class="meow-file">导入到氛围库（相册图片或 .naiv4vibe 文件）<input id="meow-vibelib-file" type="file" accept="image/*,.naiv4vibe,.json"></label><button type="button" data-gallery-pick="vibelib">从猫猫图库选</button></div>
    <div id="meow-vibelib-list"></div>
    <small>氛围库像固定正面一样长期保存：起好名字，星绘页的「氛围」里勾选就能用。编码过的结果也一起存着，下次不用再花 Anlas 编码。可以导出成官网的 .naiv4vibe 文件。</small>
    <small>V4 以后每张参考图第一次使用要先编码（官网会收少量 Anlas），同一张图、同样的信息提取值之后不再重复编码。V5 暂不支持氛围迁移。</small>
-   <h4 id="meow-sec-reference">精确参考 · Precise Reference</h4>
+   </div></details>
+<details class="meow-tools meow-config-group" id="meow-sec-reference"><summary>精确参考 · Precise Reference</summary><div class="meow-config-body">
    <div class="meow-pick"><label class="meow-file">从相册添加精确参考图<input id="meow-ref-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="reference">从猫猫图库选</button></div><div id="meow-ref-list"></div>
    <small>支持 V4.5 / V5。图片会自动补黑边成官网要求的尺寸。</small>
-   <h4 id="meow-sec-reverse">看图反推 tags</h4>
+   </div></details>
+<details class="meow-tools meow-config-group" id="meow-sec-reverse"><summary>看图反推 tags</summary><div class="meow-config-body">
    <div class="meow-pick"><label class="meow-file">从相册选任意图片<input id="meow-reverse-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="reverse">从猫猫图库选</button></div>
    <div id="meow-reverse-preview" class="meow-tool-preview"></div>
    <label>反推要求（发给副 API）<textarea id="meow-reverse-prompt" rows="3"></textarea></label>
@@ -52,16 +56,19 @@
    <label>反推结果（可修改）<textarea id="meow-reverse-result" rows="4"></textarea></label>
    <div class="meow-row"><button id="meow-reverse-replace" type="button">填进「这次想画什么」</button><button id="meow-reverse-append" type="button">追加到「这次想画什么」</button></div>
    <small>任何图都行（网图、截图、别人画的）。图片会缩到 1024 像素以内发给设置里的副 API，需要模型能看图（例如 Gemini、GPT-4o、Claude）。</small>
-   <h4 id="meow-sec-meta">读取 NovelAI 原图信息</h4>
+   </div></details>
+<details class="meow-tools meow-config-group" id="meow-sec-meta"><summary>读取 NovelAI 原图信息</summary><div class="meow-config-body">
    <div class="meow-pick"><label class="meow-file">从相册选 NovelAI 原图<input id="meow-meta-file" type="file" accept="image/*"></label><button type="button" data-gallery-pick="meta">从猫猫图库选</button></div>
    <label>读到的信息<textarea id="meow-meta-view" rows="5" readonly placeholder="读取后在这里显示提示词和参数"></textarea></label>
    <div class="meow-checks"><label><input id="meow-meta-prompt" type="checkbox" checked>正面</label><label><input id="meow-meta-negative" type="checkbox" checked>负面</label><label><input id="meow-meta-characters" type="checkbox" checked>角色</label><label><input id="meow-meta-settings" type="checkbox" checked>参数</label><label><input id="meow-meta-seed" type="checkbox">种子</label><label><input id="meow-meta-tools" type="checkbox" checked>官网功能（图生图 / 氛围 / 精确参考）</label></div>
    <button id="meow-meta-import" type="button">导入到星绘</button>
-   <h4 id="meow-sec-director">导演工具与放大</h4>
+   </div></details>
+<details class="meow-tools meow-config-group" id="meow-sec-director"><summary>导演工具与放大</summary><div class="meow-config-body">
    <label>工具<select id="meow-director-tool"></select></label>
    <div class="meow-grid"><label>表情<select id="meow-director-emotion"></select></label><label>强度（0–5）<input id="meow-director-level" type="number" min="0" max="5" step="1" value="0"></label></div>
    <label>补充提示（上色 / 改表情可填）<input id="meow-director-prompt"></label>
    <button id="meow-director-run" type="button">对基础图使用这个工具</button><small>导演工具和放大都作用在上面的「基础图」，结果存进图库。</small>
+</div></details>
    <label><input id="meow-tools-bad" type="checkbox">坏猫猫生图也带上氛围 / 精确参考</label>
    <button id="meow-tools-reset" type="button">清空官网功能设置</button>
    <button id="meow-tools-generate" type="button" class="meow-primary">✦ 带着这些设置去生图</button>
@@ -97,7 +104,7 @@
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
   <div id="meow-bad-latest"></div><small>tags 可以编辑后再生成。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.14</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.15</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <button id="meow-repair-inline" type="button">修复旧版正文插图并刷新</button><small>只移除旧版猫猫插图标记，保留原文和已存图片；新版本插图单独保存，不改正文代码。</small>
   </div></details>
 <details class="meow-tools meow-config-group" id="meow-config-novelai"><summary>✧ NovelAI</summary><div class="meow-config-body"><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><label><input id="meow-remember-token" type="checkbox" checked>在此浏览器记住直连 Token</label><button id="meow-forget-token" type="button">清除浏览器记忆</button><button id="meow-save-token" type="button">保存本地 Token</button>
