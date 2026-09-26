@@ -207,7 +207,7 @@ export async function init(){
    if(directToken&&el('remember-token').checked){try{await rememberToken();}catch{/* Keep the usable in-memory token; status shows the persistence error. */}}
   }
   keyStatus();
-  if(!directToken){page('config');el('token').focus();throw new Error('浏览器没有可用的 NovelAI 直连 Token。酒馆已保存的密钥不一定允许浏览器读取；请填写一次并保存，确认显示浏览器读回校验成功。'+(tokenStorageError?` ${tokenStorageError}`:''));}
+  if(!directToken){page('config');el('config-novelai').open=true;el('token').focus();throw new Error('浏览器没有可用的 NovelAI 直连 Token。酒馆已保存的密钥不一定允许浏览器读取；请填写一次并保存，确认显示浏览器读回校验成功。'+(tokenStorageError?` ${tokenStorageError}`:''));}
   return directToken;
  };
  const png=async(payload,signal)=>{
