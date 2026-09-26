@@ -193,10 +193,21 @@ const sentPrompt=redrawBody.input??redrawBody.prompt;assert.ok(sentPrompt.starts
 let batchCalls=0;globalThis.fetch=async()=>{batchCalls++;if(batchCalls===2)click('stop');return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
 field('draw-count','20');field('prompt','cat');click('generate');await settle();await settle();assert.equal(batchCalls,2);assert.equal($('generate').disabled,false);
 field('draw-count','1');assert.equal($('image-count').max,'20');
+// Secondary profiles preserve their own connection and secret ID, with preset isolation.
+const sec=extensionSettings.meow_secondary,keptPreset=sec.preset;
+field('secondary-url','https://one.test/v1');field('secondary-model','one');sec.secret_id='key-one';field('secondary-profile-name','一号');click('secondary-profile-save');await settle();
+const firstConnection=extensionSettings.meow_secondary_profile_id;
+field('secondary-url','https://two.test/v1');field('secondary-model','two');sec.secret_id='key-two';field('secondary-profile-name','二号');click('secondary-profile-save');await settle();
+$('secondary-profile-list').value=firstConnection;$('secondary-profile-list').dispatchEvent(new Event('change'));await settle();
+assert.equal(sec.secret_id,'key-one');assert.equal(sec.url,'https://one.test/v1');assert.equal(sec.model,'one');assert.equal(sec.preset,keptPreset);
+const profileCount=extensionSettings.meow_secondary_profiles.length;
+globalThis.confirm=()=>false;click('secondary-profile-delete');await settle();assert.equal(extensionSettings.meow_secondary_profiles.length,profileCount);
+globalThis.confirm=()=>true;click('secondary-profile-delete');await settle();assert.equal(extensionSettings.meow_secondary_profiles.length,profileCount-1);assert.equal(sec.secret_id,'key-one');
+assert.ok(extensionSettings.meow_secondary_profiles.some(p=>p.name==='二号'&&p.secret_id==='key-two'));
 // Reinitializing the UI must restore the remembered token without server key exposure.
 window.document.body.innerHTML='<div id="top-settings-holder"></div><div id="extensionsMenu"></div><div id="extensions_settings2"></div>';
 await module.init();
-assert.equal($('theme-select').options.length,2);assert.equal(extensionSettings.meow_themes[0].name,'第二套');
+assert.ok([...$('secondary-profile-list').options].some(p=>p.textContent==='二号'));assert.equal($('theme-select').options.length,2);assert.equal(extensionSettings.meow_themes[0].name,'第二套');
 assert.match($('key-status').textContent,/直连 Token 可用/);
 let restoredAuth='';globalThis.fetch=async(url,options)=>{assert.ok(String(url).startsWith('https://image.novelai.net/'));restoredAuth=options.headers.Authorization;return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
 field('transport','direct');field('prompt','cat');click('generate');await settle();
