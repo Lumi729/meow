@@ -199,3 +199,5 @@ dialog.meow-gift > * { position:relative; }
 /* Settings categories use native, keyboard-accessible disclosure controls. */
 #meow-panel .meow-config-group > summary { min-height:44px; box-sizing:border-box; align-items:center; font-weight:600; }
 #meow-panel .meow-config-body { padding:4px 0 8px; }
+#meow-panel .meow-header h2 { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+#meow-panel .meow-header-pet { height:36px; width:auto; image-rendering:pixelated; pointer-events:none; }

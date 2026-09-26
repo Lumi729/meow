@@ -2,6 +2,7 @@ const base = new URL('.', import.meta.url);
 export function mountPanel(markup, preferences, save){
  const dialog=document.createElement('dialog');dialog.id='meow-dialog';dialog.setAttribute('aria-label','Meow · 猫猫星绘');
  dialog.insertAdjacentHTML('beforeend',markup);document.body.append(dialog);
+ const title=dialog.querySelector('.meow-header h2');if(title){const pet=document.createElement('img');pet.className='meow-header-pet';pet.src=new URL('assets/cat-bunny.gif',base).href;pet.alt='';pet.draggable=false;title.append(pet);}
  let opener,mode='draw';
  const close=dialog.querySelector('#meow-close-top');
  const open=event=>{if(dialog.open)return;opener=event?.currentTarget;dialog.showModal();close.focus();};
