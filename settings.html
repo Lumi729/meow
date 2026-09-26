@@ -97,7 +97,7 @@
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
   <div id="meow-bad-latest"></div><small>tags 可以编辑后再生成。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.13</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.14</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <button id="meow-repair-inline" type="button">修复旧版正文插图并刷新</button><small>只移除旧版猫猫插图标记，保留原文和已存图片；新版本插图单独保存，不改正文代码。</small>
   </div></details>
 <details class="meow-tools meow-config-group" id="meow-config-novelai"><summary>✧ NovelAI</summary><div class="meow-config-body"><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><label><input id="meow-remember-token" type="checkbox" checked>在此浏览器记住直连 Token</label><button id="meow-forget-token" type="button">清除浏览器记忆</button><button id="meow-save-token" type="button">保存本地 Token</button>
@@ -123,8 +123,8 @@
   </div></details>
 <details class="meow-tools meow-config-group" id="meow-config-recovery"><summary>聊天界面恢复</summary><div class="meow-config-body"><label><input id="meow-recovery-auto" type="checkbox">空闲时自动恢复（默认关闭）</label><button id="meow-recovery-now" type="button">一键恢复聊天显示</button><p id="meow-recovery-status" role="status"></p><small>重新加载当前聊天，不刷新网页。自动模式在停止操作 30 秒后恢复一次，至少间隔 2 分钟；生成、猫猫任务、消息编辑、输入草稿或弹窗期间暂停。正常界面也可能重载，嵌入界面的临时状态可能丢失；其他插件的后台任务不一定能识别。重载会触发原有聊天加载脚本。已安装独立恢复版时，请先停用独立版并刷新。</small>
   </div></details>
-<details class="meow-tools meow-config-group" id="meow-config-about"><summary>关于</summary><div class="meow-config-body"><p class="meow-about">猫猫星绘 · 千千做给梨梨的礼物 ♡<br>世界为梨梨诞生。</p><button id="meow-gift-again" type="button">再看一次欢迎卡片</button>
- </div></details>
+<div class="meow-config-about"><h3>关于</h3><p class="meow-about">猫猫星绘 · 千千做给梨梨的礼物 ♡<br>世界为梨梨诞生。</p><button id="meow-gift-again" type="button">再看一次欢迎卡片</button>
+ </div>
  </section>
  <p id="meow-status" role="status" aria-live="polite">准备好就开始吧 ♡</p>
  <button id="meow-close" data-meow-close type="button">✕ 关闭猫猫星绘</button>
