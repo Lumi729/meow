@@ -1,3 +1,4 @@
+import { excerptPart } from './excerpt-bridge.js';
 import { stripInline } from './inline.js';
 import { CHARACTER_INSTRUCTIONS, validateCharacters } from './characters.js';
 export const DEFAULT_RULES = Object.freeze([
@@ -118,8 +119,9 @@ export function sceneAnchor(scene,parts){
  const base=source.anchorStart??offset;if(!Number.isInteger(base)||base<0)throw new Error('原文位置失效，请重新捕捉。');
  // Edits to the preview can shorten text; locate the quote against the unchanged source anchor.
  const original=source.anchorText??source.text;let originalAt=-1;for(let i=0;i<occurrence;i++)originalAt=original.indexOf(quote,originalAt+1);
+ if(originalAt<0&&source.excerpt){const mapped=excerptPart(quote,source.messageIndex,{mes:original});if(mapped)return {...source,anchorText:mapped.anchorText,anchorStart:base+mapped.anchorStart,renderedText:quote};}
  if(originalAt<0)throw new Error('这段文字经过改写，无法定位到正文。');
- return {...source,anchorText:quote,anchorStart:base+originalAt};
+ return {...source,anchorText:quote,anchorStart:base+originalAt,...(source.excerpt?{renderedText:quote}:{})};
 }
 
 export const REVERSE_PROMPT='看这张图，把画面写成 NovelAI 英文 tags：人数、人物外貌（发型发色、眼睛、服装、表情、动作、姿势）、构图与镜头、场景、光线、画风。只输出用英文逗号分隔的 tags，不要解释、不要编号、不要代码块。';
@@ -131,3 +133,4 @@ export function buildReverseRequest(config,image,instruction=''){
         messages:[{role:'system',content:instruction.trim()||REVERSE_PROMPT},{role:'user',content:[{type:'text',text:'这是要反推 tags 的图片。'},{type:'image_url',image_url:{url:image}}]}]};
 }
 export const cleanTags=text=>String(text??'').trim().replace(/^```\w*\s*/,'').replace(/\s*```$/,'').replace(/\n+/g,', ').replace(/\s*,\s*(,\s*)+/g,', ').trim();
+

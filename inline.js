@@ -34,13 +34,14 @@ export function removeVariant(message,group){
 }
 export function bindSwipe(element,move){let touch;element.addEventListener('touchstart',e=>{touch=e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null;},{passive:true});element.addEventListener('touchend',e=>{if(!touch||!e.changedTouches.length)return;const dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;touch=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)){element.dataset.meowSwiped='1';Promise.resolve(move(dx<0?1:-1)).catch(()=>{});setTimeout(()=>delete element.dataset.meowSwiped,350);}},{passive:true});}
 // Anchor in rendered text only. Never insert into a code block, HTML source or script.
-function normalizedText(text){
- let value='',positions=[];for(let i=0;i<text.length;i++){const c=/\s/.test(text[i])?' ':text[i];if(c===' '&&value.endsWith(' ')){positions[positions.length-1]=i+1;continue;}value+=c;positions.push(i+1);}return {value,positions};
+function normalizedText(text,compact=false){
+ let value='',positions=[];for(let i=0;i<text.length;i++){if(compact&&/\s/.test(text[i]))continue;const c=/\s/.test(text[i])?' ':text[i];if(c===' '&&value.endsWith(' ')){positions[positions.length-1]=i+1;continue;}value+=c;positions.push(i+1);}return {value,positions};
 }
 export function placeAfterQuote(body,quote,card,source={}){
  const doc=body.ownerDocument,walk=doc.createTreeWalker(body,4),nodes=[];let all='',n;
  while((n=walk.nextNode())){if(n.parentElement?.closest('script,style,pre,code,textarea,button,.meow-inline-card,[hidden]'))continue;nodes.push({n,start:all.length});all+=n.textContent;}
- const normalized=normalizedText(all),target=normalizedText(quote).value;if(!target)return false;
+ const excerpt=source.source?.excerpt||source.excerpt;quote=source.source?.renderedText??source.renderedText??quote;
+ const normalized=normalizedText(all,excerpt),target=normalizedText(quote,excerpt).value;if(!target)return false;
  const matches=[];for(let at=normalized.value.indexOf(target);at>=0;at=normalized.value.indexOf(target,at+target.length))matches.push(at);
  if(!matches.length)return false;let occurrence=0;
  if(matches.length>1){
@@ -50,7 +51,10 @@ export function placeAfterQuote(body,quote,card,source={}){
   occurrence=occurrences.indexOf(source.anchorStart);if(occurrences.length!==matches.length||occurrence<0)return false;
  }
  const end=normalized.positions[matches[occurrence]+target.length-1],hit=nodes.find(x=>end>x.start&&end<=x.start+x.n.length);if(!hit)return false;
- const range=doc.createRange();range.setStart(hit.n,end-hit.start);range.collapse(true);range.insertNode(card);return true;
+ const range=doc.createRange();range.setStart(hit.n,end-hit.start);range.collapse(true);
+ const highlight=hit.n.parentElement?.closest('.be-highlight');
+ if(highlight){const tail=doc.createRange();tail.setStart(hit.n,end-hit.start);tail.setEnd(highlight,highlight.childNodes.length);if(!tail.toString().trim()){highlight.after(card);return true;}}
+ range.insertNode(card);return true;
 }
 export function mountInline({context,chatKey,upload,generate,redraw,report}){
  let viewing=null,mutating=false;const mounted=new Map(),redrawing=new Set();
@@ -100,3 +104,4 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
  const chat=document.querySelector('#chat');if(chat){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;decorate();});}).observe(chat,{childList:true,subtree:true});}
  decorate();return {insert,decorate};
 }
+

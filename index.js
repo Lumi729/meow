@@ -2,7 +2,7 @@ import { mountCamera } from './camera.js';
 import { tokenVault } from './credentials.js';
 import { scanAppearance, appearanceScope, mergeAppearanceScan, pruneAppearanceScan, formatAppearanceProfiles } from './appearance.js';
 import { mountInline, migrateLegacy, bindSwipe, stripInline } from './inline.js';
-import { mountExcerptBridge } from './excerpt-bridge.js';
+import { mountExcerptBridge, excerptPart } from './excerpt-bridge.js';
 import { mountGift } from './gift.js';
 import { saveSettings } from '../../../../script.js';
 import * as scriptModule from '../../../../script.js';
@@ -322,9 +322,7 @@ export async function init(){
  on('bad-generate',()=>run(runBadGenerate));
  // 书摘 bridge: selected / highlighted text → 坏猫猫 → tags → picture, after asking where the picture goes.
  const pick=document.createElement('dialog');pick.id='meow-selection-dialog';pick.setAttribute('aria-label','用猫猫星绘画这段');document.body.append(pick);
- const selectionPart=(text,index)=>{const message=Number.isInteger(index)?ctx().chat[index]:null;if(!message||message.is_system)return null;const snapshot=stripInline(message.mes);
-  for(const quote of [text,text.replace(/\s+/g,' ')]){const at=snapshot.indexOf(quote);if(at>=0&&snapshot.indexOf(quote,at+1)<0)return {id:`m${index}sel`,messageIndex:index,name:message.name||'角色',part:'划线',text:quote,anchorText:quote,anchorStart:at,messageSnapshot:snapshot,selected:true};}
-  return null;};
+ const selectionPart=(text,index)=>excerptPart(text,index,Number.isInteger(index)?ctx().chat[index]:null);
  async function drawSelection({text,messageIndex}){
   if(!text)throw new Error('没有读到选中的文字，请重新选一下再点「画图」。');
   if(busy)throw new Error('猫猫正在忙，请等当前任务完成。');
@@ -368,3 +366,4 @@ export async function init(){
  try{images=await store.list();renderGallery();renderPreviews();}catch{status('当前浏览器无法打开图库存储，生成后请及时下载。');}
 }
 ctx().eventSource.on(ctx().event_types.APP_READY,()=>init().catch(error=>{console.error('Meow initialization failed:',error);const target=document.querySelector('#meow-status')||document.querySelector('#extensions_settings2');if(target){const message=document.createElement('p');message.textContent='猫猫星绘初始化失败，请更新扩展并刷新；若仍失败，请提供浏览器控制台错误。';target.append(message);}}));
+
