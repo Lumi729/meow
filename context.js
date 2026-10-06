@@ -83,8 +83,8 @@ export function buildTagRequest(config,parts,count){
         {role:'user',content:JSON.stringify({appearance_reference:config.appearance||'',...(typeof config.original_context==='string'&&config.original_context?{original_context:`这是原文，用于理解生图 tag：\n${config.original_context}`} : {}),passages:parts.map(p=>({id:p.id,speaker:p.name,section:p.part,text:p.text}))})}]};
 }
 
-/** Discover balanced XML-style tags without rendering or executing chat HTML. */
-export function splitAutoMessage(value,rules=DEFAULT_RULES){
+/** Shared balanced-tag scanner. Never renders or executes message HTML. */
+export function balancedMessageTags(value){
  const text=String(value??''),stack=[],ranges=[];
  const masked=text.replace(/(```|~~~)[\s\S]*?\1/g,m=>' '.repeat(m.length)).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,m=>' '.repeat(m.length));
  const tokens=/<!--[\s\S]*?-->|<(\/?)([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s+(?:[^<>"']|"[^"]*"|'[^']*')*?)?\s*(\/?)>/gu;
@@ -93,8 +93,14 @@ export function splitAutoMessage(value,rules=DEFAULT_RULES){
   if(!name||self||['br','hr','img','input','meta','link','source','wbr','area','base','embed','param','track','col'].includes(name.toLowerCase()))continue;
   if(!closing){stack.push({name,a:match.index,openEnd:match.index+raw.length});continue;}
   const i=stack.findLastIndex(x=>x.name===name);if(i<0)continue;
-  const top=stack[i];stack.length=i;ranges.push({...top,b:match.index+raw.length});
+  const top=stack[i];stack.length=i;ranges.push({...top,closeStart:match.index,b:match.index+raw.length});
  }
+ return ranges;
+}
+
+/** Discover outermost XML-style sections for bad-cat capture. */
+export function splitAutoMessage(value,rules=DEFAULT_RULES){
+ const text=String(value??''),ranges=balancedMessageTags(text);
  if(!ranges.length)return splitMessage(text,rules);
  // Keep the outermost balanced pair whole, including all nested tags.
  ranges.sort((a,b)=>a.a-b.a||b.b-a.b);

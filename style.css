@@ -201,3 +201,19 @@ dialog.meow-gift > * { position:relative; }
 #meow-panel .meow-config-body { padding:4px 0 8px; }
 #meow-panel .meow-header h2 { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 #meow-panel .meow-header-pet { height:36px; width:auto; image-rendering:pixelated; pointer-events:none; }
+
+/* Keep the tag picker independent of chat fonts and compact on phones. */
+#meow-panel #meow-auto-exclusion-section,
+#meow-panel #meow-auto-exclusion-section * {
+ font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif !important;
+ font-size:14px !important; font-style:normal !important; line-height:1.5 !important; letter-spacing:normal !important; text-shadow:none !important;
+}
+#meow-panel #meow-auto-exclusion-disclosure { margin:10px 0; border:1px solid var(--meow-border); border-radius:8px; padding:8px; }
+#meow-panel #meow-auto-exclusion-disclosure > summary { cursor:pointer; }
+#meow-panel #meow-auto-exclusion-disclosure:not([open]) > #meow-auto-exclusion-candidates { display:none !important; }
+#meow-panel #meow-auto-exclusion-candidates { max-height:240px; max-height:min(240px,40dvh); overflow-y:auto; overscroll-behavior:contain; }
+#meow-panel #meow-auto-exclusion-candidates label { display:flex !important; align-items:flex-start; gap:8px; margin:6px 0; padding:6px 0; }
+#meow-panel #meow-auto-exclusion-candidates input { flex:0 0 18px; width:18px !important; height:18px !important; margin:2px 0 0 !important; }
+#meow-panel #meow-auto-exclusion-candidates span,
+#meow-panel #meow-auto-exclusions input { font-family:ui-monospace,Consolas,"Microsoft YaHei",monospace !important; overflow-wrap:anywhere; min-width:0; }
+#meow-panel #meow-auto-exclusions .meow-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:6px; }
