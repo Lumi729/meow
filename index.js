@@ -81,6 +81,38 @@ export async function init(){
  const destination=()=>{let url;try{url=apiBase(secondary.url);}catch{url='尚未配置副 API 地址';}el('destination').textContent=`发送目标：${url} · 模型：${secondary.model||'未填写'}`;};
  fields.forEach(([id,k])=>{el(id).value=secondary[k];on(id,()=>{secondary[k]=el(id).value;save();destination();},'input');});destination();
 
+ // Keep named tag instructions separate from connection profiles and the current draft.
+ if(!Array.isArray(ext.meow_tag_profiles)){
+  ext.meow_tag_profiles=secondary.preset?.trim()?[{id:crypto.randomUUID(),name:'原来的生图预设',preset:secondary.preset}]:[];
+  ext.meow_tag_profile_id=ext.meow_tag_profiles[0]?.id||'';save();
+ }
+ const renderTagProfiles=()=>{const list=el('tag-profile-list');list.replaceChildren(new Option('当前编辑内容',''));for(const p of ext.meow_tag_profiles)list.add(new Option(p.name,p.id));list.value=ext.meow_tag_profile_id||'';el('tag-profile-delete').disabled=!list.value;};
+ renderTagProfiles();el('tag-profile-name').value=ext.meow_tag_profiles.find(p=>p.id===ext.meow_tag_profile_id)?.name||'';
+ on('tag-profile-save',()=>{
+  if(busy)throw new Error('请等待当前任务完成。');
+  const name=el('tag-profile-name').value.trim(),preset=el('tag-preset').value;
+  if(!name||name.length>80)throw new Error('请填写 1–80 字的预设名字。');
+  if(!preset.trim())throw new Error('请先填写预设内容。');
+  let p=ext.meow_tag_profiles.find(p=>p.name===name);
+  if(p&&!confirm(`覆盖生图预设“${name}”？`))return;
+  if(!p){p={id:crypto.randomUUID(),name};ext.meow_tag_profiles.push(p);}
+  p.preset=preset;secondary.preset=preset;ext.meow_tag_profile_id=p.id;save();renderTagProfiles();status('生图 tags 预设已保存。');
+ });
+ on('tag-profile-list',()=>{
+  const id=el('tag-profile-list').value,p=ext.meow_tag_profiles.find(p=>p.id===id);
+  if(busy){renderTagProfiles();throw new Error('请等待当前任务完成。');}
+  if(!p){ext.meow_tag_profile_id='';el('tag-profile-name').value='';save();renderTagProfiles();return;}
+  const old=ext.meow_tag_profiles.find(p=>p.id===ext.meow_tag_profile_id);
+  if(el('tag-preset').value!==p.preset&&(!old||el('tag-preset').value!==old.preset)&&!confirm('切换生图预设？当前未存入预设的修改将被替换。')){renderTagProfiles();return;}
+  secondary.preset=p.preset;el('tag-preset').value=p.preset;el('tag-profile-name').value=p.name;ext.meow_tag_profile_id=p.id;save();renderTagProfiles();status(`已切换生图预设：${p.name}`);
+ },'change');
+ on('tag-profile-delete',()=>{
+  if(busy)throw new Error('请等待当前任务完成。');
+  const p=ext.meow_tag_profiles.find(p=>p.id===el('tag-profile-list').value);
+  if(!p||!confirm(`删除生图预设“${p.name}”？当前编辑内容会保留。`))return;
+  ext.meow_tag_profiles=ext.meow_tag_profiles.filter(item=>item.id!==p.id);ext.meow_tag_profile_id='';el('tag-profile-name').value='';save();renderTagProfiles();status('预设已删除，当前编辑内容仍保留。');
+ });
+
  // Connection profiles store only server secret IDs, never plaintext keys.
  if(!Array.isArray(ext.meow_secondary_profiles)){ext.meow_secondary_profiles=secondary.url?[{id:crypto.randomUUID(),name:'原来的副 API',url:secondary.url,model:secondary.model,secret_id:secondary.secret_id}]:[];save();}
  const connectionSnapshot=()=>({url:secondary.url,model:secondary.model,secret_id:secondary.secret_id});
@@ -113,7 +145,7 @@ export async function init(){
  const activeCustomId=()=>{const list=secret_state[SECRET_KEYS.CUSTOM];return Array.isArray(list)?(list.find(x=>x?.active)?.id||''):'';};
  const restoreCustom=async id=>{if(typeof secretsModule.rotateSecret==='function'){await secretsModule.rotateSecret(SECRET_KEYS.CUSTOM,id);return activeCustomId()?activeCustomId()===id:true;}const r=await fetch('/api/secrets/rotate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify({key:SECRET_KEYS.CUSTOM,id})});return r.ok;};
  on('save-secondary',async()=>{if(busy)throw new Error('请等待当前任务完成。');apiBase(secondary.url);const value=el('secondary-key').value.trim();if(!value)throw new Error('请填写副 API 密钥。');el('save-secondary').disabled=true;try{const previous=activeCustomId();const id=await writeSecret(SECRET_KEYS.CUSTOM,value,'Meow secondary');if(!id)throw new Error('副 API 密钥保存失败。');secondary.secret_id=id;save();let kept=true;if(previous&&previous!==id){try{kept=await restoreCustom(previous);}catch{kept=false;}}keyStatus();status(kept?'副 API 密钥已单独保存，酒馆主 API 密钥保持不变。':'副 API 密钥已保存，但没能切回酒馆原来的主密钥：请在酒馆「API 连接配置」点钥匙图标，手动选回原来的密钥。');}finally{el('secondary-key').value='';el('save-secondary').disabled=false;}});
- on('tag-import',async()=>{const f=el('tag-import').files[0];if(!f)return;if(f.size>200000)throw new Error('预设文件太大。');secondary.preset=parseTagPreset(await f.text(),f.name);if(!secondary.preset.trim())throw new Error('预设没有可用文本。');el('tag-preset').value=secondary.preset;save();el('tag-import').value='';status('tags 预设已导入，可继续编辑。');},'change');
+ on('tag-import',async()=>{const f=el('tag-import').files[0];if(!f)return;if(f.size>200000)throw new Error('预设文件太大。');const imported=parseTagPreset(await f.text(),f.name);if(!imported.trim())throw new Error('预设没有可用文本。');secondary.preset=imported;el('tag-preset').value=imported;ext.meow_tag_profile_id='';el('tag-profile-name').value=f.name.replace(/\.(txt|json)$/i,'').slice(0,80);renderTagProfiles();save();el('tag-import').value='';status('tags 预设已导入，点击保存预设可加入下拉列表。');},'change');
  on('tag-export',()=>download('meow-tags-preset.json',JSON.stringify({system_prompt:secondary.preset},null,2)));
  for(const [id,k] of [['transport','transport'],['direct-model','model'],['direct-params','parameters']]){el(id).value=advanced[k];on(id,()=>{advanced[k]=el(id).value;save();},'input');}
  on('advanced-example',()=>{advanced.parameters=JSON.stringify({cfg_rescale:0,v4_prompt:{caption:{char_captions:[{char_caption:'1girl, white hair, pink dress',centers:[{x:0.5,y:0.5}]}]},use_coords:true,use_order:true},v4_negative_prompt:{caption:{char_captions:[]}}},null,2);el('direct-params').value=advanced.parameters;save();});
