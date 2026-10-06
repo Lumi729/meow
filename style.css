@@ -217,3 +217,15 @@ dialog.meow-gift > * { position:relative; }
 #meow-panel #meow-auto-exclusion-candidates span,
 #meow-panel #meow-auto-exclusions input { font-family:ui-monospace,Consolas,"Microsoft YaHei",monospace !important; overflow-wrap:anywhere; min-width:0; }
 #meow-panel #meow-auto-exclusions .meow-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:6px; }
+
+/* 0.9.18: Meow UI typography is independent of the story's decorative font. */
+:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-gift,.meow-inline-card,.meow-message-generate,.meow-be-btn),
+:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift,.meow-inline-card,.meow-be-btn) :not(.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands) {
+ font-family:Arial,"Noto Sans", "PingFang SC","Microsoft YaHei",sans-serif !important;
+ font-style:normal !important;
+ letter-spacing:normal !important;
+}
+:root :is(#meow-dialog,#meow-viewer,#meow-inline-viewer,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift) {
+ font-size:16px;
+ line-height:1.5;
+}
