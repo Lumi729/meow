@@ -6,6 +6,7 @@ import { mountExcerptBridge, excerptPart } from './excerpt-bridge.js';
 import { mountGift } from './gift.js';
 import { saveSettings } from '../../../../script.js';
 import * as scriptModule from '../../../../script.js';
+import { mountAutoDraw, visibleAutoParts, mountAutoExclusions } from './auto-draw.js';
 import { mountRecovery } from './recovery.js';
 import { updateSelf, checkUpdate } from './updater.js';
 import { mountTools } from './tools-ui.js';
@@ -350,8 +351,32 @@ export async function init(){
   return {prompt,negative_prompt:peel(payload.negative_prompt,negs)??'',characters:chars.filter(c=>c.char_caption).map((c,i)=>({name:`角色 ${i+1}`,prompt:c.char_caption,negative_prompt:negChars[i]?.char_caption||'',x:c.centers?.[0]?.x??0.5,y:c.centers?.[0]?.y??0.5}))};};
  const freshSeed=payload=>{payload.seed=crypto.getRandomValues(new Uint32Array(1))[0];if(payload.direct)payload.direct.parameters.seed=payload.seed;return payload;};
  async function redrawPayload(item,signal){const scene=item.scene||guessScene(item.payload);if(!scene)return reseed(item);const payload=freshSeed(scenePayload(scene));await tools.withTools(payload,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});return payload;}
- const runBadGenerate=async signal=>{checkChat();if(!scenes.length)throw new Error('请先捕捉原文并生成 tags。');const batch=structuredClone(scenes).map(s=>({...s,insertionSource:s.source.some(p=>Number.isInteger(p.messageIndex))?sceneAnchor(s,s.source):null})),base=config(),key=capture.key,output=secondary.output;const payloads=batch.map(s=>scenePayload(s,base));for(const p of payloads)await tools.withTools(p,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});for(let i=0;i<batch.length;i++){if(stopping)break;checkChat();status(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);const src=await png(payloads[i],signal);const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};await addImage(entry);if(output==='chat'&&entry.insertionSource){if(key!==chatKey()){status('聊天已切换，图片已存入图文相册，未插入其他聊天。');break;}await insert(entry);}if(entry.unsaved)break;}status(stopping?'已停止后续图片。':'本轮完成，在图库筛选“坏猫猫图文”可查看原文和图片。');};
+ const runBadGenerate=async (signal,automatic=null)=>{const check=automatic?.check||checkChat,items=automatic?.items||scenes;check();if(!items.length)throw new Error('请先捕捉原文并生成 tags。');const batch=structuredClone(items).map(s=>({...s,insertionSource:s.source.some(p=>Number.isInteger(p.messageIndex))?sceneAnchor(s,s.source):null})),base=config(),key=automatic?.key||capture.key,output=secondary.output;const payloads=batch.map(s=>scenePayload(s,base));for(const p of payloads)await tools.withTools(p,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});for(let i=0;i<batch.length;i++){if(stopping)break;check();status(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);const src=await png(payloads[i],signal);const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};await addImage(entry);if(automatic&&!automatic.valid()){status('原文或聊天已变化，图片已保留在图库。');break;}if(output==='chat'&&entry.insertionSource){if(key!==chatKey()){status('聊天已切换，图片已存入图文相册，未插入其他聊天。');break;}await insert(entry);}if(entry.unsaved)break;}status(stopping?'已停止后续图片。':'本轮完成，在图库筛选“坏猫猫图文”可查看原文和图片。');};
  on('bad-generate',()=>run(runBadGenerate));
+ mountAutoExclusions({root,settings:secondary,save,context:ctx});
+ const autoToggle=el('auto-draw');autoToggle.checked=!!secondary.auto_draw;
+ const autoStatus=message=>{el('auto-draw-status').textContent=message;status(message);};
+ const autoDraw=mountAutoDraw({context:ctx,enabled:()=>!!secondary.auto_draw,isBusy:()=>busy,
+  cancel:()=>{stopping=true;controller?.abort();},report:autoStatus,
+  generate:async(index,message,valid)=>run(async signal=>{
+   const check=()=>{if(signal.aborted||stopping||!valid())throw new DOMException('自动生图已取消','AbortError');};
+   check();if(!secondary.secret_id)throw new Error('请先配置副 API 密钥。');
+   const snapshot=stripInline(message.mes),key=chatKey();
+   const chosen=visibleAutoParts(snapshot,secondary.auto_exclusions).map((part,i)=>({id:`m${index}p${i}`,messageIndex:index,name:message.name||'角色',part:'本条回复（已屏蔽标签）',text:part.text,anchorText:part.text,anchorStart:part.start,messageSnapshot:snapshot,selected:true}));
+   if(!chosen.length){autoStatus('本条回复屏蔽后没有可用正文，已跳过生图。');return;}
+   const count=numberIn(secondary.image_count,1,20,'图片数'),withCharacters=!!secondary.character_mode;
+   const request=buildTagRequest({...secondary,appearance:await getAppearance()},chosen,count);check();
+   if(JSON.stringify(request).length>150000)throw new Error('本条回复太长（请求上限 150 KB），请手动选择部分正文。');
+   autoStatus('自动生图：正在把本条完整回复发送给副 API…');
+   const timeout=setTimeout(()=>controller?.abort(),120000);let data;
+   try{const response=await fetch('/api/backends/chat-completions/generate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify(request),signal});if(!response.ok)throw new Error(`副 API 失败（HTTP ${response.status}）`);data=await response.json();}finally{clearTimeout(timeout);}
+   check();if(data.choices?.[0]?.finish_reason==='length')throw new Error('tags 输出被截断，请减少图片数量。');
+   const raw=data.choices?.[0]?.message?.content;if(typeof raw!=='string')throw new Error('副 API 未返回有效 tags。');
+   const items=parseScenes(raw,chosen.map(p=>p.id),count,withCharacters).map(scene=>({...scene,source:chosen.filter(p=>scene.source_ids.includes(p.id))}));
+   await runBadGenerate(signal,{items,key,check,valid});check();autoStatus('本条回复自动生图完成，图片已保存到图库。');
+  })});
+ on('auto-draw',()=>{secondary.auto_draw=autoToggle.checked;if(!autoToggle.checked)autoDraw.reset();save();autoStatus(autoToggle.checked?'已开启：从下一条完整回复开始自动写 tags 并生图。':'自动生图已关闭。');},'change');
+
  // 书摘 bridge: selected / highlighted text → 坏猫猫 → tags → picture, after asking where the picture goes.
  const pick=document.createElement('dialog');pick.id='meow-selection-dialog';pick.setAttribute('aria-label','用猫猫星绘画这段');document.body.append(pick);
  const selectionPart=(text,index)=>excerptPart(text,index,Number.isInteger(index)?ctx().chat[index]:null);
