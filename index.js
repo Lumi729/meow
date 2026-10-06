@@ -354,6 +354,8 @@ export async function init(){
  const runBadGenerate=async (signal,automatic=null)=>{const check=automatic?.check||checkChat,items=automatic?.items||scenes;check();if(!items.length)throw new Error('请先捕捉原文并生成 tags。');const batch=structuredClone(items).map(s=>({...s,insertionSource:s.source.some(p=>Number.isInteger(p.messageIndex))?sceneAnchor(s,s.source):null})),base=config(),key=automatic?.key||capture.key,output=secondary.output;const payloads=batch.map(s=>scenePayload(s,base));for(const p of payloads)await tools.withTools(p,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});for(let i=0;i<batch.length;i++){if(stopping)break;check();status(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);const src=await png(payloads[i],signal);const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};await addImage(entry);if(automatic&&!automatic.valid()){status('原文或聊天已变化，图片已保留在图库。');break;}if(output==='chat'&&entry.insertionSource){if(key!==chatKey()){status('聊天已切换，图片已存入图文相册，未插入其他聊天。');break;}await insert(entry);}if(entry.unsaved)break;}status(stopping?'已停止后续图片。':'本轮完成，在图库筛选“坏猫猫图文”可查看原文和图片。');};
  on('bad-generate',()=>run(runBadGenerate));
  mountAutoExclusions({root,settings:secondary,save,context:ctx});
+ secondary.auto_image_count??=1;el('auto-image-count').value=secondary.auto_image_count;
+ on('auto-image-count',()=>{const count=Number(el('auto-image-count').value);if(!Number.isInteger(count)||count<1||count>20){el('auto-image-count').value=secondary.auto_image_count;throw new Error('自动生图数量请填写 1–20 的整数。');}secondary.auto_image_count=count;save();},'change');
  const autoToggle=el('auto-draw');autoToggle.checked=!!secondary.auto_draw;
  const autoStatus=message=>{el('auto-draw-status').textContent=message;status(message);};
  const autoDraw=mountAutoDraw({context:ctx,enabled:()=>!!secondary.auto_draw,isBusy:()=>busy,
@@ -364,7 +366,7 @@ export async function init(){
    const snapshot=stripInline(message.mes),key=chatKey();
    const chosen=visibleAutoParts(snapshot,secondary.auto_exclusions).map((part,i)=>({id:`m${index}p${i}`,messageIndex:index,name:message.name||'角色',part:'本条回复（已屏蔽标签）',text:part.text,anchorText:part.text,anchorStart:part.start,messageSnapshot:snapshot,selected:true}));
    if(!chosen.length){autoStatus('本条回复屏蔽后没有可用正文，已跳过生图。');return;}
-   const count=numberIn(secondary.image_count,1,20,'图片数'),withCharacters=!!secondary.character_mode;
+   const count=numberIn(secondary.auto_image_count,1,20,'自动生图数量'),withCharacters=!!secondary.character_mode;
    const request=buildTagRequest({...secondary,appearance:await getAppearance()},chosen,count);check();
    if(JSON.stringify(request).length>150000)throw new Error('本条回复太长（请求上限 150 KB），请手动选择部分正文。');
    autoStatus('自动生图：正在把本条完整回复发送给副 API…');

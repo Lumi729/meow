@@ -236,7 +236,7 @@ let restoredAuth='';globalThis.fetch=async(url,options)=>{assert.ok(String(url).
 field('transport','direct');field('prompt','cat');click('generate');await settle();
 assert.equal(restoredAuth,'Bearer test-only');
 // Automatic full-reply drawing filters selected tags without altering chat or manual drafts.
-assert.equal($('auto-draw').checked,false);
+assert.equal($('auto-draw').checked,false);assert.equal($('auto-image-count').value,'1');
 context.chat=[{name:'Char',mes:'<正文>white cat</正文><状态栏>hidden secret</状态栏>'}];
 click('auto-exclusion-scan');
 const candidates=[...$('auto-exclusion-candidates').querySelectorAll('label')];
@@ -244,10 +244,11 @@ const exclusion=candidates.find(label=>label.textContent.includes('状态栏')).
 exclusion.checked=true;exclusion.dispatchEvent(new Event('change'));
 assert.equal(extensionSettings.meow_secondary.auto_exclusions[0].start,'<状态栏>');
 const draftBefore=$('send-preview').value;let autoRequests=[],autoImages=0;
-field('image-count','1');field('output','journal');
+field('image-count','7');field('output','journal');
 globalThis.fetch=async(url,options)=>{
  if(String(url).includes('chat-completions')){
   const body=JSON.parse(options.body);autoRequests.push(body);
+  assert.match(body.messages[0].content,/恰好 1 个/);
   const passages=JSON.parse(body.messages[1].content).passages;
   assert.equal(passages.length,1);assert.equal(passages[0].text,'<正文>white cat</正文>');assert.ok(!JSON.stringify(body).includes('hidden secret'));
   return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{title:'cat',prompt:'white cat',negative_prompt:'',source_ids:[passages[0].id],anchor_source_id:passages[0].id,anchor_quote:'white cat'}]})}}]}));
@@ -258,6 +259,14 @@ $('auto-draw').checked=true;$('auto-draw').dispatchEvent(new Event('change'));
 events['generation-start']('normal');events['message-received'](0);events['generation-end']();await settle();await settle();
 assert.equal(autoRequests.length,1);assert.equal(autoImages,1);assert.equal($('send-preview').value,draftBefore);assert.ok(context.chat[0].mes.includes('hidden secret'));
 events['generation-end']();await settle();assert.equal(autoRequests.length,1);
+$('auto-image-count').value='3';$('auto-image-count').dispatchEvent(new Event('change'));await settle();
+assert.equal(extensionSettings.meow_secondary.auto_image_count,3);assert.equal(extensionSettings.meow_secondary.image_count,'7');
+$('auto-image-count').value='0';$('auto-image-count').dispatchEvent(new Event('change'));await settle();assert.equal($('auto-image-count').value,'3');
+globalThis.fetch=async(url,options)=>{
+ if(String(url).includes('chat-completions')){const body=JSON.parse(options.body);assert.match(body.messages[0].content,/恰好 3 个/);const id=JSON.parse(body.messages[1].content).passages[0].id;return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:Array.from({length:3},()=>({title:'cat',prompt:'white cat',negative_prompt:'',source_ids:[id],anchor_source_id:id,anchor_quote:'white cat'}))})}}]}));}
+ autoImages++;return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
+};
+events['generation-start']('normal');events['message-received'](0);events['generation-end']();await settle();await settle();assert.equal(autoImages,4);
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
 $('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));
