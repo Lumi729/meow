@@ -36,7 +36,7 @@ export function buildRequest(settings, randomSeed=()=>crypto.getRandomValues(new
 export async function requestImage(payload,headers,signal,fetcher=fetch){
     if(payload.cfg_rescale)throw new Error('Guidance Rescale 需要在设置中切换官网直连；酒馆通道不会转发此参数。');
     const r=await fetcher('/api/novelai/generate-image',{method:'POST',headers,signal,body:JSON.stringify(payload)});
-    if(!r.ok) throw new Error(`生图失败（HTTP ${r.status}）。请检查 Token、Anlas、参数及酒馆日志；不会自动重试。`);
+    if(!r.ok) throw new Error(`生图失败（HTTP ${r.status}）。请检查 Token、Anlas、参数及酒馆日志。`);
     const data=(await r.text()).trim();
     if(!/^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new Error('服务器未返回有效的 PNG 图片。');
     return `data:image/png;base64,${data}`;

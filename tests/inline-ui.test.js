@@ -33,3 +33,18 @@ test('repeated sentence uses the captured occurrence instead of moving outside t
  const w=new Window();w.document.body.innerHTML='<content><p>你好。开始。</p><p>你好。结束。</p></content>';const card=w.document.createElement('span');card.className='meow-inline-card';const snapshot='<content>你好。开始。你好。结束。</content>';
  assert.ok(placeAfterQuote(w.document.body,'你好。',card,{snapshot,anchorStart:snapshot.lastIndexOf('你好。')}));assert.equal(card.parentElement,w.document.querySelectorAll('p')[1]);await w.happyDOM.abort();
 });
+
+test('pending illustration updates, survives rerender, becomes image and clears on chat change',async()=>{
+ const w=new Window();globalThis.document=w.document;globalThis.MutationObserver=w.MutationObserver;
+ document.body.innerHTML='<div id="chat"><div class="mes" mesid="0"><div class="mes_text">句子。尾句。</div></div></div>';
+ let key='chat';const message={mes:'句子。尾句。'},ctx={chat:[message],event_types:{},eventSource:{on(){}},saveChat:async()=>{}};
+ const app=mountInline({context:()=>ctx,chatKey:()=>key,upload:async()=>'/images/test.png',generate:()=>{},redraw:()=>{},report:()=>{}});
+ const source={messageIndex:0,anchorText:'句子。',anchorStart:0,messageSnapshot:message.mes};
+ const slot=app.placeholder(source,key);assert.equal(document.querySelectorAll('.meow-inline-pending').length,1);
+ slot.update('重试 1/2');assert.match(document.querySelector('.meow-inline-pending').textContent,/重试 1\/2/);
+ document.querySelector('.mes_text').textContent=message.mes;app.decorate();assert.equal(document.querySelectorAll('.meow-inline-pending').length,1);
+ await app.insert({id:'ready',chatKey:key,payload:{},title:'pic',insertionSource:source});slot.remove();
+ assert.equal(document.querySelectorAll('.meow-inline-pending').length,0);assert.equal(document.querySelectorAll('.meow-inline-photo').length,1);assert.equal(message.mes,'句子。尾句。');
+ app.placeholder(source,key);key='other';app.decorate();assert.equal(document.querySelectorAll('.meow-inline-pending').length,0);
+ await w.happyDOM.abort();
+});

@@ -57,6 +57,7 @@ export function placeAfterQuote(body,quote,card,source={}){
  range.insertNode(card);return true;
 }
 export function mountInline({context,chatKey,upload,generate,redraw,report}){
+ const placeholders=new Map();
  let viewing=null,mutating=false;const mounted=new Map(),redrawing=new Set();
  const viewer=document.createElement('dialog');viewer.id='meow-inline-viewer';document.body.append(viewer);
  const button=(title,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=title;b.addEventListener('click',async e=>{e.stopPropagation();b.disabled=true;try{await fn();}catch(error){report(error.message);const p=b.closest('.meow-inline-card')?.querySelector('[role=status]')||viewer.querySelector('[role=status]');if(p)p.textContent=error.message;}finally{b.disabled=false;}});return b;};
@@ -78,7 +79,25 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
   const path=await upload(entry);if(key!==chatKey()||context().chat[source.messageIndex]!==message)throw new Error('上传时切换了聊天，未插入其他正文。');
   const group=attachVariant(message,source,{id:entry.id,path,payload:structuredClone(entry.payload),title:entry.title,...(entry.scene?{scene:structuredClone(entry.scene)}:{})});await persist();report(mounted.get(group.id)?.isConnected?'图片已插在标签内对应句子后，标签与折叠状态保持不变。':'图片和句子位置已保存；目标句暂未显示，显示后会插入原位，不移到楼层外。');return path;
  }
+ function placeholder(source,key,title='图片生成中…'){
+  if(key!==chatKey())throw new Error('聊天已切换。');
+  const message=context().chat[source.messageIndex];anchorEnd(message,source);
+  const id=crypto.randomUUID(),item={source:structuredClone(source),key,message,swipe:message.swipe_id??0,title,card:null};placeholders.set(id,item);decorate();
+  return {update(text){item.title=text;if(item.card)item.card.querySelector('[role=status]').textContent=text;},remove(){item.card?.remove();placeholders.delete(id);}};
+ }
  function decorate(){
+  for(const [id,item] of placeholders){
+   const {source,message,key,swipe}=item;
+   if(key!==chatKey()||context().chat[source.messageIndex]!==message||(message.swipe_id??0)!==swipe||stripInline(message.mes)!==source.messageSnapshot){item.card?.remove();placeholders.delete(id);continue;}
+   if(item.card?.isConnected)continue;
+   const body=document.querySelector(`#chat .mes[mesid="${source.messageIndex}"] .mes_text`);if(!body)continue;
+   const card=document.createElement('span');card.className='meow-inline-card meow-inline-pending';
+   card.style.cssText='display:block;padding:16px;margin:8px 0;border:1px dashed #bd86a0;border-radius:12px;background:#fff7fa;color:#51434a;font:14px Arial,sans-serif;';
+   const note=document.createElement('span');note.setAttribute('role','status');note.textContent=item.title;card.append(note,button('移除提示',()=>{card.remove();placeholders.delete(id);}));
+   let placed=placeAfterQuote(body,source.anchorText??source.text,card,source);
+   if(!placed)for(const frame of body.querySelectorAll('iframe')){try{if(frame.contentDocument?.body&&placeAfterQuote(frame.contentDocument.body,source.anchorText??source.text,card,source)){placed=true;break;}}catch{}}
+   if(placed)item.card=card;
+  }
   for(const [id,card] of mounted){const message=context().chat[Number(card.dataset.message)],g=message?.extra?.meow_inline?.find(x=>x.id===id);if(!card.isConnected||card.dataset.chat!==chatKey()||!g||!active(message,g)){card.remove();mounted.delete(id);}}
   document.querySelectorAll('#chat .mes[mesid]').forEach(node=>{const index=Number(node.getAttribute('mesid')),message=context().chat[index];if(!message||message.is_system||message.extra?.meow)return;const body=node.querySelector('.mes_text');if(!body)return;
    // Keep the text container untouched on messages without images: iframe renderers depend on it.
@@ -102,6 +121,6 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
  viewer.addEventListener('close',()=>viewing=null);
  const events=context().event_types;for(const name of ['CHAT_CHANGED','MESSAGE_UPDATED','MESSAGE_SWIPED','USER_MESSAGE_RENDERED','CHARACTER_MESSAGE_RENDERED'])if(events[name])context().eventSource.on(events[name],()=>{if(name==='CHAT_CHANGED'&&viewer.open)viewer.close();decorate();});
  const chat=document.querySelector('#chat');if(chat){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;decorate();});}).observe(chat,{childList:true,subtree:true});}
- decorate();return {insert,decorate};
+ decorate();return {insert,decorate,placeholder};
 }
 

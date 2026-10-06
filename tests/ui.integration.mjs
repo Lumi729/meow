@@ -279,6 +279,22 @@ globalThis.fetch=async(url,options)=>{
  autoImages++;return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
 };
 events['generation-start']('normal');events['message-received'](0);events['generation-end']();await settle();await settle();assert.equal(autoImages,4);
+// A failed second picture retries without regenerating tags or the first picture.
+assert.equal($('auto-retries').value,'2');
+$('auto-retries').value='1';$('auto-retries').dispatchEvent(new Event('change'));await settle();
+assert.equal(extensionSettings.meow_secondary.auto_retries,1);
+const chatHost=document.createElement('div');chatHost.id='chat';chatHost.innerHTML='<div class="mes" mesid="0"><div class="mes_text">white cat</div></div>';document.body.append(chatHost);
+let retryTags=0,retryImages=0;
+globalThis.fetch=async(url,options)=>{
+ if(String(url).includes('chat-completions')){retryTags++;const id=JSON.parse(JSON.parse(options.body).messages[1].content).passages[0].id;return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:Array.from({length:3},()=>({title:'cat',prompt:'white cat',negative_prompt:'',source_ids:[id],anchor_source_id:id,anchor_quote:'white cat'}))})}}]}));}
+ if(!String(url).includes('generate-image'))return new Response('{}');
+ retryImages++;if(retryImages===2)return new Response('',{status:503});
+ return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
+};
+events['generation-start']('normal');events['message-received'](0);events['generation-end']();await settle();await settle();
+assert.equal(retryImages,2);assert.equal(chatHost.querySelectorAll('.meow-inline-pending').length,2);assert.match(chatHost.textContent,/重试/);
+await new Promise(resolve=>setTimeout(resolve,2200));await settle();
+assert.equal(retryTags,1);assert.equal(retryImages,4);assert.equal(chatHost.querySelectorAll('.meow-inline-pending').length,0);assert.ok(chatHost.querySelector('.meow-inline-photo'));
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
 $('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));

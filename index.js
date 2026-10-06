@@ -1,3 +1,4 @@
+import { retryAuto } from './auto-retry.js';
 import { mountCamera } from './camera.js';
 import { tokenVault } from './credentials.js';
 import { scanAppearance, appearanceScope, mergeAppearanceScan, pruneAppearanceScan, formatAppearanceProfiles } from './appearance.js';
@@ -243,12 +244,12 @@ export async function init(){
   if(!directToken){page('config');el('config-novelai').open=true;el('token').focus();throw new Error('浏览器没有可用的 NovelAI 直连 Token。酒馆已保存的密钥不一定允许浏览器读取；请填写一次并保存，确认显示浏览器读回校验成功。'+(tokenStorageError?` ${tokenStorageError}`:''));}
   return directToken;
  };
- const png=async(payload,signal)=>{
+ const png=async(payload,signal,automatic=false)=>{
  if(payload.direct)await getToken();
  if(!payload.direct&&!secret_state[SECRET_KEYS.NOVEL])throw new Error('请先在设置里配置 NovelAI Token。');
  const started=performance.now(),route=payload.direct?'浏览器直连':'酒馆服务器转发';let stage='等待图片返回';
  const show=()=>timing(`${route} · ${stage} · 已用 ${seconds(performance.now()-started)} 秒`);show();
- const interval=setInterval(show,500),timeout=setTimeout(()=>controller?.abort(),180000);
+ const interval=setInterval(show,500),timeout=automatic?null:setTimeout(()=>controller?.abort(),180000);
  try{
  const src=payload.direct?await requestDirect(payload.direct,directToken,signal):await requestImage(payload,ctx().getRequestHeaders(),signal);
  const received=performance.now();stage='图片已返回，正在解码';show();
@@ -351,11 +352,37 @@ export async function init(){
   return {prompt,negative_prompt:peel(payload.negative_prompt,negs)??'',characters:chars.filter(c=>c.char_caption).map((c,i)=>({name:`角色 ${i+1}`,prompt:c.char_caption,negative_prompt:negChars[i]?.char_caption||'',x:c.centers?.[0]?.x??0.5,y:c.centers?.[0]?.y??0.5}))};};
  const freshSeed=payload=>{payload.seed=crypto.getRandomValues(new Uint32Array(1))[0];if(payload.direct)payload.direct.parameters.seed=payload.seed;return payload;};
  async function redrawPayload(item,signal){const scene=item.scene||guessScene(item.payload);if(!scene)return reseed(item);const payload=freshSeed(scenePayload(scene));await tools.withTools(payload,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});return payload;}
- const runBadGenerate=async (signal,automatic=null)=>{const check=automatic?.check||checkChat,items=automatic?.items||scenes;check();if(!items.length)throw new Error('请先捕捉原文并生成 tags。');const batch=structuredClone(items).map(s=>({...s,insertionSource:s.source.some(p=>Number.isInteger(p.messageIndex))?sceneAnchor(s,s.source):null})),base=config(),key=automatic?.key||capture.key,output=secondary.output;const payloads=batch.map(s=>scenePayload(s,base));for(const p of payloads)await tools.withTools(p,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});for(let i=0;i<batch.length;i++){if(stopping)break;check();status(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);const src=await png(payloads[i],signal);const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};await addImage(entry);if(automatic&&!automatic.valid()){status('原文或聊天已变化，图片已保留在图库。');break;}if(output==='chat'&&entry.insertionSource){if(key!==chatKey()){status('聊天已切换，图片已存入图文相册，未插入其他聊天。');break;}await insert(entry);}if(entry.unsaved)break;}status(stopping?'已停止后续图片。':'本轮完成，在图库筛选“坏猫猫图文”可查看原文和图片。');};
+ const runBadGenerate=async (signal,automatic=null)=>{
+  const check=automatic?.check||checkChat,items=automatic?.items||scenes;check();
+  if(!items.length)throw new Error('请先捕捉原文并生成 tags。');
+  const batch=structuredClone(items).map(s=>({...s,insertionSource:s.source.some(p=>Number.isInteger(p.messageIndex))?sceneAnchor(s,s.source):null})),base=config(),key=automatic?.key||capture.key,output=secondary.output;
+  const payloads=batch.map(s=>scenePayload(s,base));
+  for(const p of payloads)await tools.withTools(p,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});
+  check();
+  const slots=automatic?batch.map((s,i)=>s.insertionSource?inline.placeholder(s.insertionSource,key,`第 ${i+1}/${batch.length} 张：等待生图…`):null):[];
+  let completed=0;
+  try{
+   for(let i=0;i<batch.length;i++){
+    if(stopping){check();break;}check();
+    const progress=text=>{status(text);slots[i]?.update(text);};
+    progress(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);
+    const src=automatic?await retryAuto(attemptSignal=>png(payloads[i],attemptSignal,true),{...automatic.retry,signal,check,report:progress,label:`第 ${i+1} 张生图`,timeout:180000}):await png(payloads[i],signal);
+    const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;
+    entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};await addImage(entry);
+    if(automatic)check();
+    if((automatic||output==='chat')&&entry.insertionSource){if(key!==chatKey())throw new Error('聊天已切换，图片已保留在图库。');await insert(entry);}
+    slots[i]?.remove();completed=i+1;
+    if(entry.unsaved)throw new Error('图片已返回，但图库保存失败，请及时下载。');
+   }
+  }catch(error){for(let i=completed;i<slots.length;i++)slots[i]?.update(error.name==='AbortError'?'已取消生成。':`未完成：${error.message}（已有图片可在图库查看）`);throw error;}
+  status(stopping?'已停止后续图片。':'本轮完成，图片已保存到图库。');
+ };
  on('bad-generate',()=>run(runBadGenerate));
  mountAutoExclusions({root,settings:secondary,save,context:ctx});
  secondary.auto_image_count??=1;el('auto-image-count').value=secondary.auto_image_count;
  on('auto-image-count',()=>{const count=Number(el('auto-image-count').value);if(!Number.isInteger(count)||count<1||count>20){el('auto-image-count').value=secondary.auto_image_count;throw new Error('自动生图数量请填写 1–20 的整数。');}secondary.auto_image_count=count;save();},'change');
+ secondary.auto_retries??=2;el('auto-retries').value=secondary.auto_retries;
+ on('auto-retries',()=>{secondary.auto_retries=numberIn(el('auto-retries').value,0,5,'自动重试次数');save();},'change');
  const autoToggle=el('auto-draw');autoToggle.checked=!!secondary.auto_draw;
  const autoStatus=message=>{el('auto-draw-status').textContent=message;status(message);};
  const autoDraw=mountAutoDraw({context:ctx,enabled:()=>!!secondary.auto_draw,isBusy:()=>busy,
@@ -370,12 +397,16 @@ export async function init(){
    const request=buildTagRequest({...secondary,appearance:await getAppearance()},chosen,count);check();
    if(JSON.stringify(request).length>150000)throw new Error('本条回复太长（请求上限 150 KB），请手动选择部分正文。');
    autoStatus('自动生图：正在把本条完整回复发送给副 API…');
-   const timeout=setTimeout(()=>controller?.abort(),120000);let data;
-   try{const response=await fetch('/api/backends/chat-completions/generate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify(request),signal});if(!response.ok)throw new Error(`副 API 失败（HTTP ${response.status}）`);data=await response.json();}finally{clearTimeout(timeout);}
-   check();if(data.choices?.[0]?.finish_reason==='length')throw new Error('tags 输出被截断，请减少图片数量。');
-   const raw=data.choices?.[0]?.message?.content;if(typeof raw!=='string')throw new Error('副 API 未返回有效 tags。');
-   const items=parseScenes(raw,chosen.map(p=>p.id),count,withCharacters).map(scene=>({...scene,source:chosen.filter(p=>scene.source_ids.includes(p.id))}));
-   await runBadGenerate(signal,{items,key,check,valid});check();autoStatus('本条回复自动生图完成，图片已保存到图库。');
+   const retry={retries:numberIn(secondary.auto_retries,0,5,'自动重试次数')};
+   const items=await retryAuto(async attemptSignal=>{
+    const response=await fetch('/api/backends/chat-completions/generate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify(request),signal:attemptSignal});
+    if(!response.ok)throw new Error(`副 API 失败（HTTP ${response.status}）`);
+    const data=await response.json();check();
+    if(data.choices?.[0]?.finish_reason==='length')throw new Error('tags 输出被截断，请减少图片数量。');
+    const raw=data.choices?.[0]?.message?.content;if(typeof raw!=='string')throw new Error('副 API 未返回有效 tags。');
+    return parseScenes(raw,chosen.map(p=>p.id),count,withCharacters).map(scene=>({...scene,source:chosen.filter(p=>scene.source_ids.includes(p.id))}));
+   },{...retry,signal,check,report:autoStatus,label:'自动 tags'});
+   await runBadGenerate(signal,{items,key,check,valid,retry});check();autoStatus('本条回复自动生图完成，图片已保存到图库。');
   })});
  on('auto-draw',()=>{secondary.auto_draw=autoToggle.checked;if(!autoToggle.checked)autoDraw.reset();save();autoStatus(autoToggle.checked?'已开启：从下一条完整回复开始自动写 tags 并生图。':'自动生图已关闭。');},'change');
 
