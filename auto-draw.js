@@ -2,14 +2,20 @@ import { stripInline } from './inline.js';
 import { balancedMessageTags } from './context.js';
 // Only new, completed assistant generations can start an automatic paid job.
 export function mountAutoDraw({context,enabled,isBusy,generate,cancel,report,schedule=fn=>setTimeout(fn,0)}){
- let pending=null,active=false,epoch=0;
+ let pending=null,active=null,epoch=0;
  const key=()=>JSON.stringify([context().groupId,context().characterId,context().getCurrentChatId()]);
- const reset=()=>{pending=null;epoch++;if(active)cancel();};
+ const reset=(reason='自动生图已关闭或重置')=>{pending=null;epoch++;if(active){active.reason??=reason;cancel();}};
  const handlers={
-  GENERATION_STARTED(type,options={},dryRun=false){reset();if(enabled()&&!dryRun&&!['quiet','impersonate'].includes(type))pending={key:key(),epoch,index:null};},
+  GENERATION_STARTED(type,options={},dryRun=false){
+   // Background generations and prompt previews do not replace the story.
+   // Ignore them before touching the queued or running automatic job.
+   if(dryRun||['quiet','impersonate'].includes(type))return;
+   reset('新的正文生成已开始');
+   if(enabled())pending={key:key(),epoch,index:null};
+  },
   MESSAGE_RECEIVED(index,type){if(pending&&type!=='first_message'&&Number.isInteger(index))pending.index=index;},
-  GENERATION_STOPPED:reset,
-  CHAT_CHANGED:reset,
+  GENERATION_STOPPED:()=>reset('收到酒馆停止生成事件'),
+  CHAT_CHANGED:()=>reset('聊天已切换或重新加载'),
   GENERATION_ENDED(){
    const job=pending;pending=null;
    if(!job||job.index===null)return;
@@ -19,8 +25,8 @@ export function mountAutoDraw({context,enabled,isBusy,generate,cancel,report,sch
     if(isBusy()){report('本条自动生图已跳过：猫猫正在执行其他任务。');return;}
     const text=message.mes;
     const valid=()=>enabled()&&job.epoch===epoch&&job.key===key()&&context().chat?.[job.index]===message&&message.mes===text;
-    active=true;
-    try{await generate(job.index,message,valid);}catch(error){report(`自动生图停止：${error.name==='AbortError'?'已取消，已发出的请求仍可能计费':error.message}`);}finally{active=false;}
+    active=job;
+    try{await generate(job.index,message,valid);}catch(error){report(`自动生图停止：${error.name==='AbortError'?`${job.reason||'任务被停止、请求超时或原文已变化'}；已发出的请求仍可能计费`:error.message}`);}finally{if(active===job)active=null;}
    });
   },
  };

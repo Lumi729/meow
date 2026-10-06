@@ -35,3 +35,44 @@ test('scan follows outer story sections and ignores code, comments and HTML',()=
  assert.deepEqual(detectAutoTags('<x><x>nested</x></x><x>repeat</x>'),[{start:'<x>',end:'</x>'}]);
  assert.deepEqual(detectAutoTags('~~~xml\n<demo>x</demo>\n~~~'),[]);
 });
+
+for(const [type,dryRun] of [['quiet',false],['impersonate',false],['normal',true]]){
+ test(`background ${type} (dryRun=${dryRun}) preserves queued and running drawings`,async()=>{
+  const queue=[];let calls=0,cancelled=0,valid,release;
+  const ctx={chat:[{mes:'body'}],getCurrentChatId:()=> 'chat',event_types:{},eventSource:{on(){}}};
+  const {handlers:h}=mountAutoDraw({context:()=>ctx,enabled:()=>true,isBusy:()=>false,
+   generate:async(i,m,v)=>{calls++;valid=v;await new Promise(resolve=>release=resolve);},
+   cancel:()=>cancelled++,report:()=>{},schedule:fn=>queue.push(fn)});
+  h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);h.GENERATION_ENDED();
+  h.GENERATION_STARTED(type,{},dryRun);h.GENERATION_ENDED();
+  assert.equal(queue.length,1);
+  const running=queue.shift()();
+  assert.equal(calls,1);
+  try{
+   h.GENERATION_STARTED(type,{},dryRun);h.GENERATION_ENDED();
+   assert.equal(cancelled,0);assert.equal(valid(),true);assert.equal(queue.length,0);
+  }finally{release();await running;}
+ });
+}
+for(const [event,args,reason] of [
+ ['GENERATION_STARTED',['normal'],'新的正文生成已开始'],
+ ['GENERATION_STOPPED',[],'收到酒馆停止生成事件'],
+ ['CHAT_CHANGED',[],'聊天已切换或重新加载'],
+ ['reset',[],'自动生图已关闭或重置'],
+]){
+ test(`${event} still cancels an active drawing and explains why`,async()=>{
+  const queue=[],reports=[];let valid,release,cancelled=0;
+  const ctx={chat:[{mes:'body'}],getCurrentChatId:()=> 'chat',event_types:{},eventSource:{on(){}}};
+  const mounted=mountAutoDraw({context:()=>ctx,enabled:()=>true,isBusy:()=>false,
+   generate:async(i,m,v)=>{valid=v;await new Promise(resolve=>release=resolve);throw new DOMException('cancelled','AbortError');},
+   cancel:()=>cancelled++,report:message=>reports.push(message),schedule:fn=>queue.push(fn)});
+  const h=mounted.handlers;
+  h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);h.GENERATION_ENDED();
+  const running=queue.shift()();
+  try{
+   (event==='reset'?mounted.reset:h[event])(...args);
+   assert.equal(cancelled,1);assert.equal(valid(),false);
+  }finally{release();await running;}
+  assert.ok(reports[0].includes(reason));
+ });
+}
