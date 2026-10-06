@@ -19,7 +19,7 @@ test('automatic pipeline only runs once after completed output; cancellation and
  h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);await finish();await finish();assert.equal(calls,1);
  h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);h.GENERATION_STOPPED();await finish();assert.equal(calls,1);
  h.GENERATION_STARTED('quiet');h.MESSAGE_RECEIVED(0);await finish();assert.equal(calls,1);
- h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);h.CHAT_CHANGED();await finish();assert.equal(calls,1);
+ h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);h.GENERATION_STOPPED();await finish();assert.equal(calls,1);
  busy=true;h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);await finish();assert.equal(calls,1);
  busy=false;h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);enabled=false;await finish();assert.equal(calls,1);
 });
@@ -56,8 +56,7 @@ for(const [type,dryRun] of [['quiet',false],['impersonate',false],['normal',true
 }
 for(const [event,args,reason] of [
  ['GENERATION_STARTED',['normal'],'新的正文生成已开始'],
- ['GENERATION_STOPPED',[],'收到酒馆停止生成事件'],
- ['CHAT_CHANGED',[],'聊天已切换或重新加载'],
+
  ['reset',[],'自动生图已关闭或重置'],
 ]){
  test(`${event} still cancels an active drawing and explains why`,async()=>{
@@ -76,3 +75,17 @@ for(const [event,args,reason] of [
   assert.ok(reports[0].includes(reason));
  });
 }
+
+test('late stop and identical chat reload keep active request; real edits and switches invalidate it',async()=>{
+ const queue=[];let release,valid,cancelled=0,chatId='chat';
+ const ctx={chat:[{mes:'body',swipe_id:0}],getCurrentChatId:()=>chatId,event_types:{},eventSource:{on(){}}};
+ const {handlers:h}=mountAutoDraw({context:()=>ctx,enabled:()=>true,isBusy:()=>false,generate:async(i,m,v)=>{valid=v;await new Promise(r=>release=r);},cancel:()=>cancelled++,report:()=>{},schedule:fn=>queue.push(fn)});
+ h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);h.GENERATION_ENDED();const running=queue.shift()();
+ try{
+  h.GENERATION_STOPPED();assert.equal(cancelled,0);assert.equal(valid(),true);
+  ctx.chat=structuredClone(ctx.chat);h.CHAT_CHANGED();assert.equal(cancelled,0);assert.equal(valid(),true);
+  ctx.chat[0].mes='edited';assert.equal(valid(),false);ctx.chat[0].mes='body';
+  ctx.chat[0].swipe_id=1;assert.equal(valid(),false);ctx.chat[0].swipe_id=0;
+  chatId='different';h.CHAT_CHANGED();assert.equal(cancelled,1);assert.equal(valid(),false);
+ }finally{release();await running;}
+});

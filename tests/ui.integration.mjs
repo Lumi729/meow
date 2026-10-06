@@ -260,7 +260,7 @@ field('image-count','7');field('output','journal');
 globalThis.fetch=async(url,options)=>{
  if(String(url).includes('chat-completions')){
   const body=JSON.parse(options.body);autoRequests.push(body);
-  assert.match(body.messages[0].content,/恰好 1 个/);
+  assert.ok(body.messages[0].content.startsWith(extensionSettings.meow_secondary.preset+'\n'));assert.match(body.messages[0].content,/恰好 1 个/);
   const passages=JSON.parse(body.messages[1].content).passages;
   assert.equal(passages.length,1);assert.equal(passages[0].text,'<正文>white cat</正文>');assert.ok(!JSON.stringify(body).includes('hidden secret'));
   return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{title:'cat',prompt:'white cat',negative_prompt:'',source_ids:[passages[0].id],anchor_source_id:passages[0].id,anchor_quote:'white cat'}]})}}]}));

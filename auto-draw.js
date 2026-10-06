@@ -4,18 +4,20 @@ import { balancedMessageTags } from './context.js';
 export function mountAutoDraw({context,enabled,isBusy,generate,cancel,report,schedule=fn=>setTimeout(fn,0)}){
  let pending=null,active=null,epoch=0;
  const key=()=>JSON.stringify([context().groupId,context().characterId,context().getCurrentChatId()]);
+ let knownKey=key();
  const reset=(reason='自动生图已关闭或重置')=>{pending=null;epoch++;if(active){active.reason??=reason;cancel();}};
  const handlers={
   GENERATION_STARTED(type,options={},dryRun=false){
    // Background generations and prompt previews do not replace the story.
    // Ignore them before touching the queued or running automatic job.
    if(dryRun||['quiet','impersonate'].includes(type))return;
-   reset('新的正文生成已开始');
+   knownKey=key();reset('新的正文生成已开始');
    if(enabled())pending={key:key(),epoch,index:null};
   },
   MESSAGE_RECEIVED(index,type){if(pending&&type!=='first_message'&&Number.isInteger(index))pending.index=index;},
-  GENERATION_STOPPED:()=>reset('收到酒馆停止生成事件'),
-  CHAT_CHANGED:()=>reset('聊天已切换或重新加载'),
+  // Once the story has ended, its late stop events do not own the image request.
+  GENERATION_STOPPED:()=>{if(pending)reset('正文生成被停止');},
+  CHAT_CHANGED:()=>{const next=key();if(next!==knownKey){knownKey=next;reset('聊天已切换');}else if(active?.valid&&!active.valid())reset(active.reason||'原文已变化');},
   GENERATION_ENDED(){
    const job=pending;pending=null;
    if(!job||job.index===null)return;
@@ -23,8 +25,13 @@ export function mountAutoDraw({context,enabled,isBusy,generate,cancel,report,sch
     const current=context(),message=current.chat?.[job.index];
     if(!enabled()||job.epoch!==epoch||job.key!==key()||!message||message.is_user||message.is_system||message.extra?.meow||!message.mes?.trim())return;
     if(isBusy()){report('本条自动生图已跳过：猫猫正在执行其他任务。');return;}
-    const text=message.mes;
-    const valid=()=>enabled()&&job.epoch===epoch&&job.key===key()&&context().chat?.[job.index]===message&&message.mes===text;
+    const text=stripInline(message.mes),swipe=message.swipe_id??0;
+    const valid=()=>{
+     const latest=context().chat?.[job.index];
+     const reason=!enabled()?'自动生图已关闭':job.epoch!==epoch?(job.reason||'任务已重置'):job.key!==key()?'聊天已切换':!latest||latest.is_user||latest.is_system?'来源回复已删除或替换':(latest.swipe_id??0)!==swipe?'已切换回复分支':stripInline(latest.mes)!==text?'来源正文已变化':null;
+     if(reason)job.reason??=reason;return !reason;
+    };
+    job.valid=valid;
     active=job;
     try{await generate(job.index,message,valid);}catch(error){report(`自动生图停止：${error.name==='AbortError'?`${job.reason||'任务被停止、请求超时或原文已变化'}；已发出的请求仍可能计费`:error.message}`);}finally{if(active===job)active=null;}
    });
