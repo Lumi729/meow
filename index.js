@@ -1,3 +1,4 @@
+import { receiveTagStream } from './tag-stream.js';
 import { retryAuto } from './auto-retry.js';
 import { mountCamera } from './camera.js';
 import { tokenVault } from './credentials.js';
@@ -226,7 +227,7 @@ export async function init(){
  on('appearance-new',()=>{rememberDraft();el('appearance-profile').value='';loadProfile('');});
  on('appearance-latest',()=>{const p=archive[editingProfile];if(!p?.scannedText)throw new Error('此档案没有扫描候选，请先重新扫描。');el('appearance-text').value=p.scannedText;status('已载入扫描候选，检查后点“保存人物档案”才会覆盖。');});
  on('appearance-delete',()=>{const id=editingProfile;if(!archive[id])return;if(!confirm('删除此人物档案？其他聊天也不再使用它。'))return;delete archive[id];profileDrafts.delete(id);for(const state of Object.values(ext.meow_cast_profiles))state.ids=state.ids.filter(x=>x!==id);editingProfile='';save();showAppearance();});
- const setBusy=value=>{busy=value;for(const id of ['generate','tags','bad-generate','capture','save-token','save-secondary','update-self'])el(id).disabled=value;el('stop').hidden=!value;el('tags').textContent=value?'正在处理，请稍候…':'② 只发送勾选内容，生成 tags';root.setAttribute('aria-busy',String(value));};
+ const setBusy=value=>{busy=value;for(const id of ['generate','tags','bad-generate','capture','save-token','save-secondary','update-self','auto-resend'])el(id).disabled=value;el('stop').hidden=!value;el('tags').textContent=value?'正在处理，请稍候…':'② 只发送勾选内容，生成 tags';root.setAttribute('aria-busy',String(value));};
  const run=async fn=>{if(busy)throw new Error('猫猫正在忙，请等待当前任务完成。');stopping=false;controller=new AbortController();setBusy(true);try{await fn(controller.signal);}finally{setBusy(false);controller=null;}};
  on('repair-inline',()=>run(async()=>{let changed=false;for(const message of ctx().chat)changed=migrateLegacy(message)||changed;if(changed){await ctx().saveChat();window.location.reload();}else status('当前聊天没有旧版插图标记，无需修复。');}));
  on('update-self',()=>run(async()=>{if(modelsLoading)throw new Error('请等待模型列表拉取完成。');status('正在更新 Meow，成功后自动刷新酒馆…');await updateSelf(folder,ctx().getRequestHeaders(),saveSettings,()=>window.location.reload());}));
@@ -359,7 +360,7 @@ export async function init(){
   const payloads=batch.map(s=>scenePayload(s,base));
   for(const p of payloads)await tools.withTools(p,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});
   check();
-  const slots=automatic?batch.map((s,i)=>s.insertionSource?inline.placeholder(s.insertionSource,key,`第 ${i+1}/${batch.length} 张：等待生图…`):null):[];
+  const slots=automatic?.slots||(automatic?batch.map((s,i)=>s.insertionSource?inline.placeholder(s.insertionSource,key,`第 ${i+1}/${batch.length} 张：等待生图…`):null):[]);
   const readyEntries=new Map();
   const sourceSwipes=batch.map(s=>ctx().chat[s.insertionSource?.messageIndex]?.swipe_id??0);
   const retryPicture=i=>run(async retrySignal=>{
@@ -379,10 +380,11 @@ export async function init(){
   });
   let completed=0;
   try{
+   if(automatic?.deferError)throw automatic.deferError;
    for(let i=0;i<batch.length;i++){
     if(stopping){check();break;}check();
     const progress=text=>{status(text);slots[i]?.update(text);};
-    progress(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);
+    progress(`${automatic?'自动生图':'坏猫猫'}正在画第 ${automatic?.ordinal??i+1}/${automatic?.total??batch.length} 张…`);
     const src=automatic?await retryAuto(attemptSignal=>png(payloads[i],attemptSignal,true),{...automatic.retry,signal,check,report:progress,label:`第 ${i+1} 张生图`,timeout:180000}):await png(payloads[i],signal);
     const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;
     entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};readyEntries.set(i,entry);await addImage(entry);
@@ -414,24 +416,46 @@ export async function init(){
    const chosen=visibleAutoParts(snapshot,secondary.auto_exclusions).map((part,i)=>({id:`m${index}p${i}`,messageIndex:index,name:message.name||'角色',part:'本条回复（已屏蔽标签）',text:part.text,anchorText:part.text,anchorStart:part.start,messageSnapshot:snapshot,selected:true}));
    if(!chosen.length){autoStatus('本条回复屏蔽后没有可用正文，已跳过生图。');return;}
    const count=numberIn(secondary.auto_image_count,1,20,'自动生图数量'),withCharacters=!!secondary.character_mode;
-   const request=buildTagRequest({...secondary,appearance:await getAppearance()},chosen,count);check();
-   el('auto-request').value=JSON.stringify({model:request.model,max_tokens:request.max_tokens,messages:request.messages},null,2);
+   const request={...buildTagRequest({...secondary,appearance:await getAppearance()},chosen,count),stream:true};check();
+   el('auto-request').value=JSON.stringify({model:request.model,stream:request.stream,max_tokens:request.max_tokens,messages:request.messages},null,2);
    if(JSON.stringify(request).length>150000)throw new Error('本条回复太长（请求上限 150 KB），请手动选择部分正文。');
    autoStatus('自动生图：正在把本条完整回复发送给副 API…');
    const retry={retries:numberIn(secondary.auto_retries,0,5,'自动重试次数')};
-   const items=await retryAuto(async attemptSignal=>{
-    const response=await fetch('/api/backends/chat-completions/generate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify(request),signal:attemptSignal});
-    const responseText=await response.text();el('auto-raw').value=responseText;
-    if(!response.ok)throw new Error(`副 API 失败（HTTP ${response.status}），请展开自动生图诊断查看返回。`);
-    let data;try{data=JSON.parse(responseText);}catch{throw new Error('副 API 返回不是 JSON，请查看自动生图原始返回。');}check();
-    const received=data.choices?.[0]?.message?.content;
-    el('auto-raw').value=typeof received==='string'?received:responseText;
-    if(data.choices?.[0]?.finish_reason==='length')throw new Error('tags 输出被截断，请减少图片数量。');
-    const raw=data.choices?.[0]?.message?.content;if(typeof raw!=='string')throw new Error('副 API 未返回有效 tags。');
-    return parseScenes(raw,chosen.map(p=>p.id),count,withCharacters).map(scene=>({...scene,source:chosen.filter(p=>scene.source_ids.includes(p.id))}));
-   },{...retry,signal,check,report:autoStatus,label:'自动 tags'});
-   autoStatus('自动 tags 已通过校验，正在准备图片…');
-   await runBadGenerate(signal,{items,key,check,valid,retry});check();autoStatus('本条回复自动生图完成，图片已保存到图库。');
+   let accepted=0,queue=Promise.resolve(),imageError=null,tagError=null;
+   const enqueue=scene=>{
+    check();
+    const item={...scene,source:chosen.filter(p=>scene.source_ids.includes(p.id))};
+    const anchor=sceneAnchor(item,item.source); // Validate before spending on an image.
+    const ordinal=accepted+1;
+    const slot=inline.placeholder(anchor,key,`第 ${ordinal}/${count} 张：tags 已收到，等待生图…`);
+    accepted=ordinal;
+    const retryOne=()=>run(async retrySignal=>{
+     const retryCheck=()=>{if(retrySignal.aborted||stopping||!valid())throw new DOMException('来源已变化或任务已停止','AbortError');};
+     await runBadGenerate(retrySignal,{items:[item],key,check:retryCheck,valid,retry,ordinal,total:count,slots:[slot]});
+    });
+    queue=queue.then(async()=>{
+     try{check();await runBadGenerate(signal,{items:[item],key,check,valid,retry,ordinal,total:count,slots:[slot],deferError:imageError});}
+     catch(error){
+      imageError??=error;
+      slot?.update(`这张图未完成：${error.message}`);
+      // runBadGenerate installs its cached-image retry when preparation succeeded.
+      if(!slot?.hasRetry())slot?.retry(retryOne);
+     }
+    });
+    autoStatus(`自动 tags：已接收 ${accepted}/${count} 个完整场景，图片正在排队生成…`);
+   };
+   try{
+    await retryAuto(attemptSignal=>receiveTagStream({request,headers:ctx().getRequestHeaders(),signal:attemptSignal,
+     sourceIds:chosen.map(p=>p.id),count,withCharacters,onScene:enqueue,onText:text=>{el('auto-raw').value=text;}
+    }),{...retry,signal,check,report:autoStatus,label:'自动 tags',timeout:0,shouldRetry:()=>accepted===0});
+   }catch(error){tagError=error;}
+   // A tags failure must not cancel valid pictures already queued or in flight.
+   await queue;check();
+   if(tagError||imageError){
+    const details=[tagError?.message,imageError?.message].filter(Boolean).join('；');
+    throw new Error(`${details}。已保留 ${accepted}/${count} 个场景；成功图片不会重画，未完成图片可在正文单独重试。`);
+   }
+   autoStatus('本条回复自动生图完成，图片已保存到图库。');
   })});
  const resendLatest=()=>{
   if(scriptModule.isGenerating?.())throw new Error('请等正文生成结束后再重新生图。');

@@ -321,6 +321,43 @@ retryButtons()[0].click();await settle();await settle();
 assert.equal(singleTags,1);assert.equal(singleImages,3);assert.equal(retryButtons().length,1);
 retryButtons()[0].click();await settle();await settle();
 assert.equal(singleTags,1);assert.equal(singleImages,4);assert.equal(retryButtons().length,0);
+// Stream the first scene while the provider is still working on the second.
+let streamWriter,streamTags=0,streamImages=0,streamId,releaseStreamImage;
+const sse=content=>new TextEncoder().encode('data: '+JSON.stringify({choices:[{index:0,delta:{content}}]})+'\n\n');
+globalThis.fetch=async(url,options)=>{
+ if(String(url).includes('chat-completions')){
+  streamTags++;const body=JSON.parse(options.body);assert.equal(body.stream,true);
+  streamId=JSON.parse(body.messages[1].content).passages[0].id;
+  return new Response(new ReadableStream({start(c){streamWriter=c;}}),{headers:{'Content-Type':'text/event-stream'}});
+ }
+ if(!String(url).includes('generate-image'))return new Response('{}');
+ streamImages++;
+ if(streamImages===1)return new Promise(resolve=>{releaseStreamImage=()=>resolve(new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]})));});
+ return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
+};
+const streamingScene=()=>JSON.stringify({prompt:'white cat',source_ids:[streamId],anchor_source_id:streamId,anchor_quote:'white cat'});
+click('auto-resend');await settle();
+streamWriter.enqueue(sse('{"scenes":['+streamingScene()));await settle();await settle();
+assert.equal(streamImages,1,'first picture starts before the rest of the tags arrives');
+assert.equal($('auto-resend').disabled,true,'stream job remains busy until reception and images finish');
+assert.match($('auto-raw').value,/white cat/);
+streamWriter.enqueue(sse(','+streamingScene()+','+streamingScene()+']}'));
+streamWriter.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+await settle();assert.equal(streamImages,1,'image requests remain serial while tags keep arriving');
+assert.equal(JSON.parse($('auto-raw').value).scenes.length,3);
+releaseStreamImage();
+await settle();await settle();assert.equal(streamTags,1);assert.equal(streamImages,3);assert.equal($('auto-resend').disabled,false);
+// A broken later response retains the first picture and never restarts all tags.
+$('auto-retries').value='1';$('auto-retries').dispatchEvent(new Event('change'));
+click('auto-resend');await settle();
+streamWriter.enqueue(sse('{"scenes":['+streamingScene()));await settle();await settle();
+assert.equal(streamImages,4);
+streamWriter.error(new Error('connection lost'));await settle();await settle();
+assert.equal(streamTags,2);assert.equal(streamImages,4);assert.match($('auto-draw-status').textContent,/已保留 1\/3/);
+assert.equal($('auto-resend').disabled,false);
+// Stopping an open stream must release the busy state and schedule no new pictures.
+click('auto-resend');await settle();click('stop');await settle();await settle();
+assert.equal(streamTags,3);assert.equal(streamImages,4);assert.equal($('auto-resend').disabled,false);
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
 $('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));

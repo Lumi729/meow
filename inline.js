@@ -83,7 +83,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
   if(key!==chatKey())throw new Error('聊天已切换。');
   const message=context().chat[source.messageIndex];anchorEnd(message,source);
   const id=crypto.randomUUID(),item={source:structuredClone(source),key,message,swipe:message.swipe_id??0,title,card:null};placeholders.set(id,item);decorate();
-  return {retry(fn){item.retry=fn;item.card?.remove();item.card=null;decorate();},update(text){item.title=text;if(item.card)item.card.querySelector('[role=status]').textContent=text;},remove(){item.card?.remove();placeholders.delete(id);}};
+  return {hasRetry:()=>!!item.retry,retry(fn){item.retry=fn;item.card?.remove();item.card=null;decorate();},update(text){item.title=text;if(item.card)item.card.querySelector('[role=status]').textContent=text;},remove(){item.card?.remove();placeholders.delete(id);}};
  }
  function decorate(){
   for(const [id,item] of placeholders){
