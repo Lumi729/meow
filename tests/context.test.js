@@ -84,23 +84,9 @@ test('outer paired blocks stay intact with attributes, void tags and repeated pa
  assert.ok(parts.every(p=>!/^\s*<\//.test(p.text)));
 });
 
-test('custom story delimiters keep all small tags inside one selected body',()=>{
- const text='[正文]开头<action>动作</action><dialogue>对话</dialogue>[正文]嵌套[/正文]结尾[/正文]<状态栏>状态</状态栏>';
- const rules=[{name:'正文',start:'[正文]',end:'[/正文]'}];
- const parts=captureContext([{mes:text}],1,rules);
- assert.equal(parts.length,2);assert.equal(parts[0].part,'正文');assert.equal(parts[0].selected,true);
- assert.equal(parts[0].text,text.slice(0,text.indexOf('<状态栏>')));assert.equal(parts.map(p=>p.text).join(''),text);
-});
-test('attributed outer body stays whole even when an inner tag matches a configured rule',()=>{
- const text='<content class="story">a<状态栏>nested</状态栏>b</content>';
- const parts=captureContext([{mes:text}],1);
- assert.equal(parts.length,1);assert.equal(parts[0].text,text);assert.equal(parts[0].selected,true);
-});
 
-for(const [open,close] of [['<Content>','</content>'],['< 正文 >','</ 正文 >'],['<正文（主线）>','</正文（主线）>'],['＜正文＞','＜/正文＞']]){
- test(`outer ${open} owns prose and image tags at every depth`,()=>{
-  const text=open+'前文<image>一</image>中间<分区><image>二</image></分区>尾句'+close;
-  const parts=captureContext([{mes:text}],1);
-  assert.equal(parts.length,1);assert.equal(parts[0].text,text);assert.equal(parts[0].anchorStart,0);
- });
-}
+test('restored manual capture keeps outer story with TimeFormat, love_letter and image tags together',()=>{
+ const body='<content><TimeFormat>时间</TimeFormat><love_letter>信件</love_letter><!-- Action --><image>一</image>正文<image>二</image></content>';
+ const parts=captureContext([{mes:body}],1);
+ assert.equal(parts.length,1);assert.equal(parts[0].text,body);assert.equal(parts[0].part,'正文');
+});

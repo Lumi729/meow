@@ -31,6 +31,7 @@ const $=id=>document.querySelector('#meow-'+id);
 const click=id=>$(id).click();
 const field=(id,value)=>{$(id).value=value;$(id).dispatchEvent(new Event('input',{bubbles:true}));};
 const settle=async()=>{for(let i=0;i<30;i++)await new Promise(r=>setTimeout(r,5));};
+const allIds=[...document.querySelectorAll('[id]')].map(e=>e.id);assert.equal(new Set(allIds).size,allIds.length,'UI ids must be unique');
 assert.ok($('floating'));assert.ok($('top-button'));assert.ok(!$('panel').querySelector('details[open]'));
 click('wand-button');assert.ok($('dialog').open);click('close');assert.ok(!$('dialog').open);
 click('floating');assert.ok($('dialog').open);
@@ -61,7 +62,7 @@ $('secondary-model-list').value='model-a';$('secondary-model-list').dispatchEven
 globalThis.fetch=async()=>new Response(JSON.stringify({error:true}));click('fetch-models');await settle();assert.equal($('fetch-models').disabled,false);assert.match($('models-state').textContent,/未返回模型列表/);assert.equal(extensionSettings.meow_secondary.model,'model-a');
 let calls=[];
 globalThis.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});if(url.includes('chat-completions'))return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:[{prompt:'a white cat',source_ids:['m0p0'],anchor_source_id:'m0p0',anchor_quote:'white cat'}]})}}]}));return new Response('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');};
-click('capture');await settle();assert.equal($('context-list').querySelectorAll('input[type=checkbox]').length,2);assert.ok(!$('send-preview').value.includes('private'));
+click('capture');await settle();assert.equal($('context-list').querySelectorAll('input[type=checkbox]').length,2);assert.match($('context-summary').textContent,/已捕捉 2 段/);assert.equal($('context-count').value,'5');assert.ok($('capture-original').value.includes(context.chat[0].mes));assert.ok(!$('send-preview').value.includes('private'));
 const choice=$('context-list').querySelector('input');choice.checked=true;choice.dispatchEvent(new Event('change'));
 click('tags');await settle();assert.equal(calls.length,1);assert.ok(!JSON.stringify(calls[0]).includes('do not send private'));assert.equal($('scenes').querySelectorAll('textarea').length,3);
 click('bad-generate');await settle();assert.equal(calls.length,2);assert.equal(calls[1].body.prompt,'pastel, a white cat');assert.equal($('gallery').querySelectorAll('article').length,1);
