@@ -24,14 +24,14 @@ test('automatic pipeline only runs once after completed output; cancellation and
  busy=false;h.GENERATION_STARTED('normal');h.MESSAGE_RECEIVED(0);enabled=false;await finish();assert.equal(calls,1);
 });
 
-test('scan follows outer story sections and ignores code, comments and HTML',()=>{
+test('exclusion scan includes nested and HTML pairs but ignores code and comments',()=>{
  const text='<div><正文>body<strong>bold</strong><opt id="1">choice</opt></正文></div>'
  +'<状态栏><opt id="2">nested</opt></状态栏><状态栏>again</状态栏>'
  +'<!-- <commented>no</commented> -->'+'```xml\n<example>no</example>\n```'
  +'<script>const s="<fake>no</fake>";</script><style><fake>no</fake></style>'
  +'<p>paragraph</p><button>button</button><unclosed>';
- assert.deepEqual(detectAutoTags(text),[{start:'<正文>',end:'</正文>'},{start:'<状态栏>',end:'</状态栏>'}]);
- assert.deepEqual(detectAutoTags('<Arc role="selection_only"><opt id="1">one</opt><opt id="2">two</opt></Arc>'),[{start:'<Arc role="selection_only">',end:'</Arc>'}]);
+ assert.deepEqual(detectAutoTags(text).map(p=>p.start),['<div>','<正文>','<strong>','<opt id="1">','<状态栏>','<opt id="2">','<p>','<button>']);
+ assert.deepEqual(detectAutoTags('<Arc role="selection_only"><opt id="1">one</opt><opt id="2">two</opt></Arc>'),[{start:'<Arc role="selection_only">',end:'</Arc>'},{start:'<opt id="1">',end:'</opt>'},{start:'<opt id="2">',end:'</opt>'}]);
  assert.deepEqual(detectAutoTags('<x><x>nested</x></x><x>repeat</x>'),[{start:'<x>',end:'</x>'}]);
  assert.deepEqual(detectAutoTags('~~~xml\n<demo>x</demo>\n~~~'),[]);
 });

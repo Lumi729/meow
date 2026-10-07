@@ -94,12 +94,13 @@ export function buildTagRequest(config,parts,count){
 export function balancedMessageTags(value){
  const text=String(value??''),stack=[],ranges=[];
  const masked=text.replace(/(```|~~~)[\s\S]*?\1/g,m=>' '.repeat(m.length)).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,m=>' '.repeat(m.length));
- const tokens=/<!--[\s\S]*?-->|<(\/?)([\p{L}_][\p{L}\p{N}_.:-]*)(?:\s+(?:[^<>"']|"[^"]*"|'[^']*')*?)?\s*(\/?)>/gu;
- for(const match of masked.matchAll(tokens)){
+ const tokenText=masked.replace(/＜/g,'<').replace(/＞/g,'>');
+ const tokens=/<!--[\s\S]*?-->|<\s*(\/?)\s*([^\s<>\/"'=!?]+)(?:\s+(?:[^<>"']|"[^"]*"|'[^']*')*?)?\s*(\/?)>/gu;
+ for(const match of tokenText.matchAll(tokens)){
   const [raw,closing,name,self]=match;
   if(!name||self||['br','hr','img','input','meta','link','source','wbr','area','base','embed','param','track','col'].includes(name.toLowerCase()))continue;
   if(!closing){stack.push({name,a:match.index,openEnd:match.index+raw.length});continue;}
-  const i=stack.findLastIndex(x=>x.name===name);if(i<0)continue;
+  const i=stack.findLastIndex(x=>x.name.toLowerCase()===name.toLowerCase());if(i<0)continue;
   const top=stack[i];stack.length=i;ranges.push({...top,closeStart:match.index,b:match.index+raw.length});
  }
  return ranges;

@@ -96,3 +96,11 @@ test('attributed outer body stays whole even when an inner tag matches a configu
  const parts=captureContext([{mes:text}],1);
  assert.equal(parts.length,1);assert.equal(parts[0].text,text);assert.equal(parts[0].selected,true);
 });
+
+for(const [open,close] of [['<Content>','</content>'],['< 正文 >','</ 正文 >'],['<正文（主线）>','</正文（主线）>'],['＜正文＞','＜/正文＞']]){
+ test(`outer ${open} owns prose and image tags at every depth`,()=>{
+  const text=open+'前文<image>一</image>中间<分区><image>二</image></分区>尾句'+close;
+  const parts=captureContext([{mes:text}],1);
+  assert.equal(parts.length,1);assert.equal(parts[0].text,text);assert.equal(parts[0].anchorStart,0);
+ });
+}

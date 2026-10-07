@@ -99,14 +99,11 @@ export function mountAutoExclusions({root,settings,save,context}){
  root.querySelector('#meow-auto-exclusion-add').addEventListener('click',()=>{settings.auto_exclusions.push({start:'',end:''});save();render();});render();
 }
 
-// Only custom story sections are scan candidates; HTML wrappers are not sections.
-const HTML_TAGS=new Set('html head body title base link meta style script noscript template slot div span p a b i u s em strong small sub sup del ins mark pre code blockquote q cite abbr address time data br hr img picture source figure figcaption audio video track canvas svg path g rect circle foreignobject math iframe object embed param ul ol li dl dt dd table caption colgroup col thead tbody tfoot tr th td form label input button select option optgroup textarea fieldset legend datalist output progress meter details summary dialog h1 h2 h3 h4 h5 h6 header footer main nav section article aside hgroup search menu wbr area map'.split(' '));
+// Exclusion choices deliberately include nested pairs; manual capture stays outermost.
 export function detectAutoTags(value){
- const text=String(value??''),pairs=[],seen=new Set();let cursor=0;
- const ranges=balancedMessageTags(text).filter(r=>!HTML_TAGS.has(r.name.toLowerCase())).sort((a,b)=>a.a-b.a||b.b-a.b);
+ const text=String(value??''),pairs=[],seen=new Set();
+ const ranges=balancedMessageTags(text).sort((a,b)=>a.a-b.a||b.b-a.b);
  for(const range of ranges){
-  if(range.a<cursor)continue;
-  cursor=range.b;
   const pair={start:text.slice(range.a,range.openEnd),end:text.slice(range.closeStart,range.b)};
   const key=JSON.stringify(pair);if(!seen.has(key)){seen.add(key);pairs.push(pair);}
  }

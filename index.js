@@ -385,12 +385,11 @@ export async function init(){
  on('auto-retries',()=>{secondary.auto_retries=numberIn(el('auto-retries').value,0,5,'自动重试次数');save();},'change');
  const autoToggle=el('auto-draw');autoToggle.checked=!!secondary.auto_draw;
  const autoStatus=message=>{el('auto-draw-status').textContent=message;status(message);};
- let lastAuto=null;
  const autoDraw=mountAutoDraw({context:ctx,enabled:()=>!!secondary.auto_draw,isBusy:()=>busy,
   cancel:()=>{stopping=true;controller?.abort();},report:autoStatus,
   generate:async(index,message,valid)=>run(async signal=>{
    const check=()=>{if(signal.aborted||stopping||!valid())throw new DOMException('自动生图已取消','AbortError');};
-   lastAuto={index,key:chatKey(),text:stripInline(message.mes),swipe:message.swipe_id??0};el('auto-resend').disabled=false;el('auto-raw').value='';el('auto-request').value='';
+   el('auto-raw').value='';el('auto-request').value='';
    check();if(!secondary.secret_id)throw new Error('请先配置副 API 密钥。');
    const snapshot=stripInline(message.mes),key=chatKey();
    const chosen=visibleAutoParts(snapshot,secondary.auto_exclusions).map((part,i)=>({id:`m${index}p${i}`,messageIndex:index,name:message.name||'角色',part:'本条回复（已屏蔽标签）',text:part.text,anchorText:part.text,anchorStart:part.start,messageSnapshot:snapshot,selected:true}));
@@ -415,12 +414,13 @@ export async function init(){
    autoStatus('自动 tags 已通过校验，正在准备图片…');
    await runBadGenerate(signal,{items,key,check,valid,retry});check();autoStatus('本条回复自动生图完成，图片已保存到图库。');
   })});
- on('auto-resend',()=>{
-  if(!lastAuto||lastAuto.key!==chatKey())throw new Error('请切回上次自动生图的聊天后重发。');
-  const message=ctx().chat?.[lastAuto.index];
-  if(!message||stripInline(message.mes)!==lastAuto.text||(message.swipe_id??0)!==lastAuto.swipe)throw new Error('上次原文已变化，请重新捕捉正文后手动发送。');
-  autoDraw.resend(lastAuto.index);
- });
+ const resendLatest=()=>{
+  if(scriptModule.isGenerating?.())throw new Error('请等正文生成结束后再重新生图。');
+  const index=ctx().chat?.findLastIndex(message=>!message.is_user&&!message.is_system&&!message.extra?.meow&&message.mes?.trim());
+  if(!Number.isInteger(index)||index<0)throw new Error('当前聊天没有可生图的角色回复。');
+  autoDraw.resend(index);
+ };
+ on('auto-resend',resendLatest);on('auto-resend-bad',resendLatest);
  on('auto-draw',()=>{secondary.auto_draw=autoToggle.checked;if(!autoToggle.checked)autoDraw.reset();save();autoStatus(autoToggle.checked?'已开启：从下一条完整回复开始自动写 tags 并生图。':'自动生图已关闭。');},'change');
 
  // 书摘 bridge: selected / highlighted text → 坏猫猫 → tags → picture, after asking where the picture goes.

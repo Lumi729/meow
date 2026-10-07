@@ -300,7 +300,8 @@ assert.ok($('auto-raw').value.includes('scenes'));assert.equal($('auto-resend').
 $('auto-retries').value='0';$('auto-retries').dispatchEvent(new Event('change'));
 let resendCalls=0;
 globalThis.fetch=async(url)=>{if(String(url).includes('chat-completions')){resendCalls++;return new Response(JSON.stringify({choices:[{message:{content:'不是 JSON 的 tags'}}]}));}return new Response('{}');};
-click('auto-resend');await settle();await settle();
+assert.ok($('auto-resend-bad').closest('[data-view="bad"]'));
+click('auto-resend-bad');await settle();await settle();
 assert.equal(resendCalls,1);assert.equal($('auto-raw').value,'不是 JSON 的 tags');assert.match($('auto-draw-status').textContent,/JSON/);
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
