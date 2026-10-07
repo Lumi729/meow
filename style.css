@@ -80,7 +80,7 @@
 #meow-panel .meow-camera p {white-space:pre-wrap;overflow-wrap:anywhere;}
 
 .meow-inline-card {display:block;max-width:100%;margin:12px 0;clear:both;}
-.meow-inline-card>[role=status] {display:block;font-size:12px;opacity:.8;}
+.meow-inline-card>[role=status] {display:block;font-size:.75em;opacity:.8;}
 .meow-inline-card>small {white-space:pre-wrap;max-height:8em;overflow:auto;}
 #meow-panel #meow-latest,#meow-panel #meow-bad-latest {margin-top:14px;}
 
@@ -205,8 +205,8 @@ dialog.meow-gift > * { position:relative; }
 /* Keep the tag picker independent of chat fonts and compact on phones. */
 #meow-panel #meow-auto-exclusion-section,
 #meow-panel #meow-auto-exclusion-section * {
- font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif !important;
- font-size:14px !important; font-style:normal !important; line-height:1.5 !important; letter-spacing:normal !important; text-shadow:none !important;
+ font-family:var(--meow-font-family,Arial,sans-serif) !important;
+ font-size:calc(var(--meow-font-size,16px) * .875) !important; font-style:normal !important; line-height:1.5 !important; letter-spacing:normal !important; text-shadow:none !important;
 }
 #meow-panel #meow-auto-exclusion-disclosure { margin:10px 0; border:1px solid var(--meow-border); border-radius:8px; padding:8px; }
 #meow-panel #meow-auto-exclusion-disclosure > summary { cursor:pointer; }
@@ -215,18 +215,18 @@ dialog.meow-gift > * { position:relative; }
 #meow-panel #meow-auto-exclusion-candidates label { display:flex !important; align-items:flex-start; gap:8px; margin:6px 0; padding:6px 0; }
 #meow-panel #meow-auto-exclusion-candidates input { flex:0 0 18px; width:18px !important; height:18px !important; margin:2px 0 0 !important; }
 #meow-panel #meow-auto-exclusion-candidates span,
-#meow-panel #meow-auto-exclusions input { font-family:ui-monospace,Consolas,"Microsoft YaHei",monospace !important; overflow-wrap:anywhere; min-width:0; }
+#meow-panel #meow-auto-exclusions input { font-family:var(--meow-font-family,Arial,sans-serif) !important; overflow-wrap:anywhere; min-width:0; }
 #meow-panel #meow-auto-exclusions .meow-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:6px; }
 
 /* 0.9.18: Meow UI typography is independent of the story's decorative font. */
-:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-gift,.meow-inline-card,.meow-message-generate,.meow-be-btn),
-:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift,.meow-inline-card,.meow-be-btn) :not(.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands) {
- font-family:Arial,"Noto Sans", "PingFang SC","Microsoft YaHei",sans-serif !important;
+:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-gift,.meow-inline-card,.meow-message-generate,.meow-be-btn),
+:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift,.meow-inline-card,.meow-be-btn) :not(.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands) {
+ font-family:var(--meow-font-family,Arial,"Noto Sans","PingFang SC","Microsoft YaHei",sans-serif) !important;
  font-style:normal !important;
  letter-spacing:normal !important;
 }
-:root :is(#meow-dialog,#meow-viewer,#meow-inline-viewer,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift) {
- font-size:16px;
+:root :is(#meow-dialog,#meow-panel,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-inline-card,.meow-message-generate,.meow-be-btn,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift) {
+ font-size:var(--meow-font-size,16px) !important;
  line-height:1.5;
 }
 
@@ -244,3 +244,7 @@ dialog.meow-gift > * { position:relative; }
 #meow-tag-editor .meow-editor-position { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 #meow-tag-editor .meow-editor-actions { display:flex; flex-wrap:wrap; gap:8px; position:sticky; bottom:-18px; padding:8px 0; background:#fff8fb; }
 #meow-tag-editor [role=status] { overflow-wrap:anywhere; }
+
+/* Font settings remain readable on narrow screens. */
+#meow-panel #meow-font-preview { padding:12px; margin:12px 0; border:1px dashed var(--meow-border); border-radius:12px; overflow-wrap:anywhere; }
+#meow-panel #meow-font-custom-row[hidden],#meow-panel #meow-font-url-row[hidden] { display:none !important; }

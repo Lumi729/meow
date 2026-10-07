@@ -1,3 +1,4 @@
+import { mountTypography } from './typography.js';
 import { mountTagEditor } from './tag-editor.js';
 import { receiveTagStream } from './tag-stream.js';
 import { retryAuto } from './auto-retry.js';
@@ -198,6 +199,7 @@ export async function init(){
  };
  const discardThemeDraft=()=>el('theme-title').value===(ext.meow_theme.name||'')&&el('theme-css').value===(ext.meow_theme.css||'')||confirm('编辑框中有尚未应用或保存的修改，确定放弃这些修改吗？');
  applyTheme();
+ mountTypography(document,ext,save);
  on('theme-save',()=>{if(keepTheme(el('theme-title').value,el('theme-css').value))status('美化已保存并应用，下次可直接选择。');});
  on('theme-select',()=>{const t=ext.meow_themes.find(t=>t.id===el('theme-select').value);if(!t||!discardThemeDraft()){renderThemes();return;}setTheme(t.name,t.css,t.id);status(`已切换美化：${t.name}`);},'change');
  on('theme-delete',()=>{const id=el('theme-select').value,t=ext.meow_themes.find(t=>t.id===id);if(!t||!confirm(`删除已保存的“${t.name}”？当前外观会保留。`))return;ext.meow_themes=ext.meow_themes.filter(t=>t.id!==id);ext.meow_theme_id='';save();renderThemes();status('已删除收藏，当前外观保留。');});
