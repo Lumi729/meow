@@ -23,12 +23,12 @@ export function mountAutoDraw({context,enabled,isBusy,generate,cancel,report,sch
    if(!job||job.index===null)return;
    schedule(async()=>{
     const current=context(),message=current.chat?.[job.index];
-    if(!enabled()||job.epoch!==epoch||job.key!==key()||!message||message.is_user||message.is_system||message.extra?.meow||!message.mes?.trim())return;
+    if((!job.manual&&!enabled())||job.epoch!==epoch||job.key!==key()||!message||message.is_user||message.is_system||message.extra?.meow||!message.mes?.trim())return;
     if(isBusy()){report('本条自动生图已跳过：猫猫正在执行其他任务。');return;}
     const text=stripInline(message.mes),swipe=message.swipe_id??0;
     const valid=()=>{
      const latest=context().chat?.[job.index];
-     const reason=!enabled()?'自动生图已关闭':job.epoch!==epoch?(job.reason||'任务已重置'):job.key!==key()?'聊天已切换':!latest||latest.is_user||latest.is_system?'来源回复已删除或替换':(latest.swipe_id??0)!==swipe?'已切换回复分支':stripInline(latest.mes)!==text?'来源正文已变化':null;
+     const reason=!job.manual&&!enabled()?'自动生图已关闭':job.epoch!==epoch?(job.reason||'任务已重置'):job.key!==key()?'聊天已切换':!latest||latest.is_user||latest.is_system?'来源回复已删除或替换':(latest.swipe_id??0)!==swipe?'已切换回复分支':stripInline(latest.mes)!==text?'来源正文已变化':null;
      if(reason)job.reason??=reason;return !reason;
     };
     job.valid=valid;
@@ -38,7 +38,13 @@ export function mountAutoDraw({context,enabled,isBusy,generate,cancel,report,sch
   },
  };
  for(const [name,handler] of Object.entries(handlers)){const event=context().event_types[name];if(event)context().eventSource.on(event,handler);}
- return {reset,handlers};
+ function resend(index){
+  if(pending||active||isBusy())throw new Error('请等待当前正文或猫猫任务结束后再发送。');
+  const message=context().chat?.[index];
+  if(!message||message.is_user||message.is_system||message.extra?.meow||!message.mes?.trim())throw new Error('找不到可重新发送的角色回复。');
+  knownKey=key();pending={key:key(),epoch,index,manual:true};handlers.GENERATION_ENDED();
+ }
+ return {reset,handlers,resend};
 }
 
 // Literal paired delimiters; only balanced ranges are removed. Retain source offsets.

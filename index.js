@@ -385,29 +385,42 @@ export async function init(){
  on('auto-retries',()=>{secondary.auto_retries=numberIn(el('auto-retries').value,0,5,'自动重试次数');save();},'change');
  const autoToggle=el('auto-draw');autoToggle.checked=!!secondary.auto_draw;
  const autoStatus=message=>{el('auto-draw-status').textContent=message;status(message);};
+ let lastAuto=null;
  const autoDraw=mountAutoDraw({context:ctx,enabled:()=>!!secondary.auto_draw,isBusy:()=>busy,
   cancel:()=>{stopping=true;controller?.abort();},report:autoStatus,
   generate:async(index,message,valid)=>run(async signal=>{
    const check=()=>{if(signal.aborted||stopping||!valid())throw new DOMException('自动生图已取消','AbortError');};
+   lastAuto={index,key:chatKey(),text:stripInline(message.mes),swipe:message.swipe_id??0};el('auto-resend').disabled=false;el('auto-raw').value='';el('auto-request').value='';
    check();if(!secondary.secret_id)throw new Error('请先配置副 API 密钥。');
    const snapshot=stripInline(message.mes),key=chatKey();
    const chosen=visibleAutoParts(snapshot,secondary.auto_exclusions).map((part,i)=>({id:`m${index}p${i}`,messageIndex:index,name:message.name||'角色',part:'本条回复（已屏蔽标签）',text:part.text,anchorText:part.text,anchorStart:part.start,messageSnapshot:snapshot,selected:true}));
    if(!chosen.length){autoStatus('本条回复屏蔽后没有可用正文，已跳过生图。');return;}
    const count=numberIn(secondary.auto_image_count,1,20,'自动生图数量'),withCharacters=!!secondary.character_mode;
    const request=buildTagRequest({...secondary,appearance:await getAppearance()},chosen,count);check();
+   el('auto-request').value=JSON.stringify({model:request.model,max_tokens:request.max_tokens,messages:request.messages},null,2);
    if(JSON.stringify(request).length>150000)throw new Error('本条回复太长（请求上限 150 KB），请手动选择部分正文。');
    autoStatus('自动生图：正在把本条完整回复发送给副 API…');
    const retry={retries:numberIn(secondary.auto_retries,0,5,'自动重试次数')};
    const items=await retryAuto(async attemptSignal=>{
     const response=await fetch('/api/backends/chat-completions/generate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify(request),signal:attemptSignal});
-    if(!response.ok)throw new Error(`副 API 失败（HTTP ${response.status}）`);
-    const data=await response.json();check();
+    const responseText=await response.text();el('auto-raw').value=responseText;
+    if(!response.ok)throw new Error(`副 API 失败（HTTP ${response.status}），请展开自动生图诊断查看返回。`);
+    let data;try{data=JSON.parse(responseText);}catch{throw new Error('副 API 返回不是 JSON，请查看自动生图原始返回。');}check();
+    const received=data.choices?.[0]?.message?.content;
+    el('auto-raw').value=typeof received==='string'?received:responseText;
     if(data.choices?.[0]?.finish_reason==='length')throw new Error('tags 输出被截断，请减少图片数量。');
     const raw=data.choices?.[0]?.message?.content;if(typeof raw!=='string')throw new Error('副 API 未返回有效 tags。');
     return parseScenes(raw,chosen.map(p=>p.id),count,withCharacters).map(scene=>({...scene,source:chosen.filter(p=>scene.source_ids.includes(p.id))}));
    },{...retry,signal,check,report:autoStatus,label:'自动 tags'});
+   autoStatus('自动 tags 已通过校验，正在准备图片…');
    await runBadGenerate(signal,{items,key,check,valid,retry});check();autoStatus('本条回复自动生图完成，图片已保存到图库。');
   })});
+ on('auto-resend',()=>{
+  if(!lastAuto||lastAuto.key!==chatKey())throw new Error('请切回上次自动生图的聊天后重发。');
+  const message=ctx().chat?.[lastAuto.index];
+  if(!message||stripInline(message.mes)!==lastAuto.text||(message.swipe_id??0)!==lastAuto.swipe)throw new Error('上次原文已变化，请重新捕捉正文后手动发送。');
+  autoDraw.resend(lastAuto.index);
+ });
  on('auto-draw',()=>{secondary.auto_draw=autoToggle.checked;if(!autoToggle.checked)autoDraw.reset();save();autoStatus(autoToggle.checked?'已开启：从下一条完整回复开始自动写 tags 并生图。':'自动生图已关闭。');},'change');
 
  // 书摘 bridge: selected / highlighted text → 坏猫猫 → tags → picture, after asking where the picture goes.

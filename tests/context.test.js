@@ -83,3 +83,16 @@ test('outer paired blocks stay intact with attributes, void tags and repeated pa
  const parts=splitAutoMessage(text);assert.equal(parts.length,2);assert.equal(parts[0].name,'details');assert.equal(parts[1].text,'<history>next</history>');assert.equal(parts.map(p=>p.text).join(''),text);
  assert.ok(parts.every(p=>!/^\s*<\//.test(p.text)));
 });
+
+test('custom story delimiters keep all small tags inside one selected body',()=>{
+ const text='[正文]开头<action>动作</action><dialogue>对话</dialogue>[正文]嵌套[/正文]结尾[/正文]<状态栏>状态</状态栏>';
+ const rules=[{name:'正文',start:'[正文]',end:'[/正文]'}];
+ const parts=captureContext([{mes:text}],1,rules);
+ assert.equal(parts.length,2);assert.equal(parts[0].part,'正文');assert.equal(parts[0].selected,true);
+ assert.equal(parts[0].text,text.slice(0,text.indexOf('<状态栏>')));assert.equal(parts.map(p=>p.text).join(''),text);
+});
+test('attributed outer body stays whole even when an inner tag matches a configured rule',()=>{
+ const text='<content class="story">a<状态栏>nested</状态栏>b</content>';
+ const parts=captureContext([{mes:text}],1);
+ assert.equal(parts.length,1);assert.equal(parts[0].text,text);assert.equal(parts[0].selected,true);
+});

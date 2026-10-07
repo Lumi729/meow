@@ -17,7 +17,14 @@ export function splitMessage(text,rules=DEFAULT_RULES){
         let pos=0;
         while(pos<text.length){
             const a=text.indexOf(rule.start,pos);if(a<0)break;
-            const b=text.indexOf(rule.end,a+rule.start.length);if(b<0)break;
+            let b=-1,scan=a+rule.start.length,depth=1;
+            while(depth){
+                const end=text.indexOf(rule.end,scan);if(end<0)break;
+                const nested=rule.start===rule.end?-1:text.indexOf(rule.start,scan);
+                if(nested>=0&&nested<end){depth++;scan=nested+rule.start.length;}
+                else{depth--;b=end;scan=end+rule.end.length;}
+            }
+            if(depth||b<0)break;
             matches.push({a,b:b+rule.end.length,name:rule.name,text:text.slice(a,b+rule.end.length)});
             pos=b+rule.end.length;
         }
@@ -101,14 +108,19 @@ export function balancedMessageTags(value){
 /** Discover outermost XML-style sections for bad-cat capture. */
 export function splitAutoMessage(value,rules=DEFAULT_RULES){
  const text=String(value??''),ranges=balancedMessageTags(text);
+ // Merge configured literal sections and discovered tags before choosing outer ranges.
+ let offset=0;
+ for(const part of splitMessage(text,rules)){
+  const a=text.indexOf(part.text,offset);offset=a+part.text.length;
+  if(part.name!=='未分类原文')ranges.push({a,b:offset,name:part.name,configured:true});
+ }
  if(!ranges.length)return splitMessage(text,rules);
- // Keep the outermost balanced pair whole, including all nested tags.
- ranges.sort((a,b)=>a.a-b.a||b.b-a.b);
+ ranges.sort((a,b)=>a.a-b.a||b.b-a.b||Number(!!b.configured)-Number(!!a.configured));
  const parts=[];let cursor=0;
  for(const range of ranges){
   if(range.a<cursor)continue;
   if(range.a>cursor)parts.push(...splitMessage(text.slice(cursor,range.a),rules));
-  const main=['content','正文'].includes(range.name.toLowerCase());parts.push({name:main?'正文':range.name,text:text.slice(range.a,range.b),automatic:!main});cursor=range.b;
+  const main=['content','正文'].includes(range.name.toLowerCase());parts.push({name:main?'正文':range.name,text:text.slice(range.a,range.b),automatic:!main&&!range.configured});cursor=range.b;
  }
  if(cursor<text.length)parts.push(...splitMessage(text.slice(cursor),rules));
  return parts;

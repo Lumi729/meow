@@ -89,3 +89,12 @@ test('late stop and identical chat reload keep active request; real edits and sw
   chatId='different';h.CHAT_CHANGED();assert.equal(cancelled,1);assert.equal(valid(),false);
  }finally{release();await running;}
 });
+
+test('manual resend works with automatic switch off and rejects busy jobs',async()=>{
+ const queue=[];let calls=0,busy=false;
+ const ctx={chat:[{mes:'body'}],getCurrentChatId:()=> 'chat',event_types:{},eventSource:{on(){}}};
+ const app=mountAutoDraw({context:()=>ctx,enabled:()=>false,isBusy:()=>busy,generate:async(i,m,valid)=>{assert.equal(valid(),true);calls++;},cancel(){},report(){},schedule:fn=>queue.push(fn)});
+ app.resend(0);await queue.shift()();assert.equal(calls,1);
+ busy=true;assert.throws(()=>app.resend(0),/等待/);busy=false;
+ assert.throws(()=>app.resend(1),/找不到/);
+});

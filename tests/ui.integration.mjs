@@ -295,6 +295,13 @@ events['generation-start']('normal');events['message-received'](0);events['gener
 assert.equal(retryImages,2);assert.equal(chatHost.querySelectorAll('.meow-inline-pending').length,2);assert.match(chatHost.textContent,/重试/);
 await new Promise(resolve=>setTimeout(resolve,2200));await settle();
 assert.equal(retryTags,1);assert.equal(retryImages,4);assert.equal(chatHost.querySelectorAll('.meow-inline-pending').length,0);assert.ok(chatHost.querySelector('.meow-inline-photo'));
+assert.ok($('auto-request').value.includes('messages'));assert.ok(!$('auto-request').value.includes('secret_id'));
+assert.ok($('auto-raw').value.includes('scenes'));assert.equal($('auto-resend').disabled,false);
+$('auto-retries').value='0';$('auto-retries').dispatchEvent(new Event('change'));
+let resendCalls=0;
+globalThis.fetch=async(url)=>{if(String(url).includes('chat-completions')){resendCalls++;return new Response(JSON.stringify({choices:[{message:{content:'不是 JSON 的 tags'}}]}));}return new Response('{}');};
+click('auto-resend');await settle();await settle();
+assert.equal(resendCalls,1);assert.equal($('auto-raw').value,'不是 JSON 的 tags');assert.match($('auto-draw-status').textContent,/JSON/);
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
 $('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));
