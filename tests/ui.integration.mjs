@@ -333,13 +333,30 @@ globalThis.fetch=async(url,options)=>{
  return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
 };
 click('auto-resend');await settle();await settle();
-assert.equal(singleTags,1);assert.equal(singleImages,2);
+assert.equal(singleTags,1);assert.equal(singleImages,3,'third picture runs after the second fails');
+assert.match($('auto-draw-status').textContent,/已完成 2 张.*跳过 1 张/);
 const retryButtons=()=>[...chatHost.querySelectorAll('.meow-inline-pending button')].filter(b=>b.textContent==='重新生这张图');
-assert.equal(retryButtons().length,2);
-retryButtons()[0].click();await settle();await settle();
-assert.equal(singleTags,1);assert.equal(singleImages,3);assert.equal(retryButtons().length,1);
+assert.equal(retryButtons().length,1);
 retryButtons()[0].click();await settle();await settle();
 assert.equal(singleTags,1);assert.equal(singleImages,4);assert.equal(retryButtons().length,0);
+// Reproduce the reported sixth-anchor failure: all later images still run, strictly serial.
+$('auto-image-count').value='12';$('auto-image-count').dispatchEvent(new Event('change'));
+let skippedTags=0,queuedImages=0,inFlight=0,maxInFlight=0;
+globalThis.fetch=async(url,options)=>{
+ if(String(url).includes('chat-completions')){
+  skippedTags++;const id=JSON.parse(JSON.parse(options.body).messages[1].content).passages[0].id;
+  const scenes=Array.from({length:12},(_,i)=>({prompt:`white cat scene ${i+1}`,source_ids:[id],anchor_source_id:id,anchor_quote:i===5?'not in the original':'white cat'}));
+  return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes})}}]}));
+ }
+ if(!String(url).includes('generate-image'))return new Response('{}');
+ queuedImages++;maxInFlight=Math.max(maxInFlight,++inFlight);
+ await new Promise(resolve=>setTimeout(resolve,5));inFlight--;
+ return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
+};
+click('auto-resend');await settle();await settle();await settle();
+assert.equal(skippedTags,1);assert.equal(queuedImages,11);assert.equal(maxInFlight,1);assert.equal(inFlight,0);
+assert.match($('auto-draw-status').textContent,/已完成 11 张.*跳过 1 张.*第 6 张/);
+$('auto-image-count').value='3';$('auto-image-count').dispatchEvent(new Event('change'));
 // Stream the first scene while the provider is still working on the second.
 let streamWriter,streamTags=0,streamImages=0,streamId,releaseStreamImage;
 const sse=content=>new TextEncoder().encode('data: '+JSON.stringify({choices:[{index:0,delta:{content}}]})+'\n\n');

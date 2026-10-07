@@ -390,7 +390,6 @@ export async function init(){
   });
   let completed=0;
   try{
-   if(automatic?.deferError)throw automatic.deferError;
    for(let i=0;i<batch.length;i++){
     if(stopping){check();break;}check();
     const progress=text=>{status(text);slots[i]?.update(text);};
@@ -431,22 +430,29 @@ export async function init(){
    if(JSON.stringify(request).length>150000)throw new Error('本条回复太长（请求上限 150 KB），请手动选择部分正文。');
    autoStatus('自动生图：正在把本条完整回复发送给副 API…');
    const retry={retries:numberIn(secondary.auto_retries,0,5,'自动重试次数')};
-   let accepted=0,queue=Promise.resolve(),imageError=null,tagError=null;
-   const enqueue=scene=>{
-    check();
+   let accepted=0,received=0,completed=0,queue=Promise.resolve(),tagError=null;
+   const failures=[];
+   const skipped=(error,sceneIndex)=>{
+    check();received=Math.max(received,sceneIndex+1);
+    failures.push(`第 ${sceneIndex+1} 张：${error.message}`);
+    autoStatus(`已跳过第 ${sceneIndex+1} 张，继续处理后续场景。原因：${error.message}`);
+   };
+   const enqueue=(scene,sceneIndex)=>{
+    check();received=Math.max(received,sceneIndex+1);
     const item={...scene,source:chosen.filter(p=>scene.source_ids.includes(p.id))};
     const anchor=sceneAnchor(item,item.source); // Validate before spending on an image.
-    const ordinal=accepted+1;
+    const ordinal=sceneIndex+1;
     const slot=inline.placeholder(anchor,key,`第 ${ordinal}/${count} 张：tags 已收到，等待生图…`);
-    accepted=ordinal;
+    accepted++;
     const retryOne=()=>run(async retrySignal=>{
      const retryCheck=()=>{if(retrySignal.aborted||stopping||!valid())throw new DOMException('来源已变化或任务已停止','AbortError');};
      await runBadGenerate(retrySignal,{items:[item],key,check:retryCheck,valid,retry,ordinal,total:count,slots:[slot]});
     });
     queue=queue.then(async()=>{
-     try{check();await runBadGenerate(signal,{items:[item],key,check,valid,retry,ordinal,total:count,slots:[slot],deferError:imageError});}
+     try{check();await runBadGenerate(signal,{items:[item],key,check,valid,retry,ordinal,total:count,slots:[slot]});completed++;}
      catch(error){
-      imageError??=error;
+      if(signal.aborted||stopping||!valid())return;
+      skipped(error,sceneIndex);
       slot?.update(`这张图未完成：${error.message}`);
       // runBadGenerate installs its cached-image retry when preparation succeeded.
       if(!slot?.hasRetry())slot?.retry(retryOne);
@@ -456,15 +462,14 @@ export async function init(){
    };
    try{
     await retryAuto(attemptSignal=>receiveTagStream({request,headers:ctx().getRequestHeaders(),signal:attemptSignal,
-     sourceIds:chosen.map(p=>p.id),count,withCharacters,onScene:enqueue,onText:text=>{el('auto-raw').value=text;}
-    }),{...retry,signal,check,report:autoStatus,label:'自动 tags',timeout:0,shouldRetry:()=>accepted===0});
+     sourceIds:chosen.map(p=>p.id),count,withCharacters,onScene:enqueue,onSceneError:skipped,onText:text=>{el('auto-raw').value=text;}
+    }),{...retry,signal,check,report:autoStatus,label:'自动 tags',timeout:0,shouldRetry:()=>received===0});
    }catch(error){tagError=error;}
    // A tags failure must not cancel valid pictures already queued or in flight.
    await queue;check();
-   if(tagError||imageError){
-    const details=[tagError?.message,imageError?.message].filter(Boolean).join('；');
-    throw new Error(`${details}。已保留 ${accepted}/${count} 个场景；成功图片不会重画，未完成图片可在正文单独重试。`);
-   }
+   const skippedInfo=failures.length?`跳过 ${failures.length} 张（${failures.join('；')}）。`:'';
+   if(tagError)throw new Error(`${tagError.message}。已保留 ${accepted}/${count} 个场景，已完成 ${completed} 张；${skippedInfo}成功图片不会重画。`);
+   if(failures.length){autoStatus(`本轮处理结束：已完成 ${completed} 张，${skippedInfo}生图失败的占位框可单独重试；插图定位失败的场景未发送生图请求。`);return;}
    autoStatus('本条回复自动生图完成，图片已保存到图库。');
   })});
  const resendLatest=()=>{

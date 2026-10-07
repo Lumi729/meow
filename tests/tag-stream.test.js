@@ -93,3 +93,23 @@ test('invalid references and excess scenes never become paid jobs', () => {
     const invalid = sceneStream({ ...options, onScene: () => accepted++ });
     assert.throws(() => invalid.push('{"scenes":[' + JSON.stringify({ ...scene, source_ids: ['unknown'] })), /引用/); assert.equal(accepted, 1);
 });
+
+test('one invalid scene or anchor callback failure does not stop later streamed scenes', async () => {
+ const p=pipe(),received=[],skipped=[];
+ const pending=receiveTagStream({...base,count:4,fetcher:async()=>p.response,
+  onScene:(value,i)=>{if(i===2)throw new Error('插图句子与原文不一致');received.push(i);},
+  onSceneError:(error,i)=>skipped.push({i,message:error.message})});
+ p.send(frame('{"scenes":['+JSON.stringify(scene)+','+JSON.stringify({...scene,source_ids:['missing']})));
+ await tick();assert.deepEqual(received,[0]);assert.equal(skipped[0].i,1);
+ p.send(frame(','+JSON.stringify(scene)+','+JSON.stringify(scene)+']}'));p.send('data: [DONE]\n\n');
+ const result=await pending;assert.equal(result.length,2);assert.deepEqual(received,[0,3]);assert.deepEqual(skipped.map(x=>x.i),[1,2]);
+});
+
+test('skip handler never swallows explicit cancellation or allows more than the requested count',()=>{
+ let skipped=0,processed=0;
+ const parser=sceneStream({...options,onScene:()=>{throw new DOMException('stop','AbortError');},onSceneError:()=>skipped++});
+ assert.throws(()=>parser.push('{"scenes":['+JSON.stringify(scene)),{name:'AbortError'});assert.equal(skipped,0);
+ const limited=sceneStream({...options,count:1,onScene:()=>processed++,onSceneError:()=>skipped++});
+ assert.throws(()=>limited.push('{"scenes":['+JSON.stringify(scene)+','+JSON.stringify(scene)+']}'),/超过/);
+ assert.equal(processed,1);assert.equal(skipped,0);
+});

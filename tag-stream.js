@@ -1,10 +1,11 @@
 import { parseScenes } from './context.js';
 
 // Scan structure, not braces inside quoted tags or nested character objects.
-export function sceneStream({ count, sourceIds, withCharacters, onScene, onText = () => {} }) {
+export function sceneStream({ count, sourceIds, withCharacters, onScene, onSceneError, onText = () => {} }) {
     let raw = '', cursor = 0, quoted = false, escaped = false, stringStart = 0;
     let key = '', arrayDepth = 0, start = -1, delivered = 0;
     const stack = [];
+    const accepted = [];
     return {
         push(text) {
             raw += text;
@@ -31,29 +32,45 @@ export function sceneStream({ count, sourceIds, withCharacters, onScene, onText 
                     if (opening !== (c === '}' ? '{' : '[')) throw new Error('tags JSON 结构不完整。');
                     if (start >= 0 && stack.length === arrayDepth) {
                         if (delivered >= count) throw new Error('返回场景超过所选数量，已停止追加。');
-                        const scene = JSON.parse(raw.slice(start, cursor + 1));
-                        const [validated] = parseScenes(JSON.stringify({ scenes: [scene] }), sourceIds, 1, withCharacters);
-                        onScene(validated, delivered++);
+                        const index = delivered++;
+                        try {
+                            const scene = JSON.parse(raw.slice(start, cursor + 1));
+                            const [validated] = parseScenes(JSON.stringify({ scenes: [scene] }), sourceIds, 1, withCharacters);
+                            onScene(validated, index);
+                            accepted.push(validated);
+                        } catch (error) {
+                            if (!onSceneError || error.name === 'AbortError') throw error;
+                            onSceneError(error, index);
+                        }
                         start = -1;
                     }
                     if (arrayDepth && stack.length < arrayDepth) arrayDepth = 0;
                 } else if (c === ',' && stack.length === 1) key = '';
             }
         },
-        finish() { return parseScenes(raw, sourceIds, count, withCharacters); },
+        finish() {
+            if (!onSceneError) return parseScenes(raw, sourceIds, count, withCharacters);
+            // Validate the final envelope without rejecting all scenes again because
+            // one complete scene was already reported and skipped.
+            let result;
+            try { result = JSON.parse(raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
+            catch { throw new Error('副 API 未返回完整 JSON；已接收的场景会保留。'); }
+            if (!Array.isArray(result?.scenes) || result.scenes.length !== count || delivered !== count) throw new Error(`副 API 应返回 ${count} 个场景；已接收的场景会保留。`);
+            return accepted;
+        },
     };
 }
 
 // OpenAI-compatible SSE through SillyTavern; also accept providers returning JSON.
 // The timer measures inactivity, so a healthy long stream is not cut off at 120 s.
-export async function receiveTagStream({ request, headers, signal, onScene, onText, sourceIds, count, withCharacters, idleTimeout = 120000, fetcher = fetch }) {
+export async function receiveTagStream({ request, headers, signal, onScene, onSceneError, onText, sourceIds, count, withCharacters, idleTimeout = 120000, fetcher = fetch }) {
     const controller = new AbortController();
     let timer, timedOut = false, reader;
     const touch = () => { clearTimeout(timer); timer = setTimeout(() => { timedOut = true; controller.abort(); }, idleTimeout); };
     const abort = () => controller.abort(signal.reason);
     controller.signal.addEventListener('abort', () => { reader?.cancel().catch(() => {}); }, { once: true });
     signal?.throwIfAborted(); signal?.addEventListener('abort', abort, { once: true }); touch();
-    const parser = sceneStream({ count, sourceIds, withCharacters, onScene, onText });
+    const parser = sceneStream({ count, sourceIds, withCharacters, onScene, onSceneError, onText });
     let finishReason, refusal = '';
     const consume = data => {
         if (data?.error) { onText?.(JSON.stringify(data)); throw new Error(`副 API 错误：${data.error.message || JSON.stringify(data.error)}`); }
