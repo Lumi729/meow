@@ -305,6 +305,22 @@ assert.equal($('auto-resend-bad'),null);assert.ok($('auto-resend').closest('#meo
 const manualDraftBeforeResend=$('send-preview').value;
 click('auto-resend');await settle();await settle();assert.equal($('send-preview').value,manualDraftBeforeResend);
 assert.equal(resendCalls,1);assert.equal($('auto-raw').value,'不是 JSON 的 tags');assert.match($('auto-draw-status').textContent,/JSON/);
+// A failed picture can be retried in place without re-requesting tags or earlier pictures.
+let singleTags=0,singleImages=0;
+globalThis.fetch=async(url,options)=>{
+ if(String(url).includes('chat-completions')){singleTags++;const id=JSON.parse(JSON.parse(options.body).messages[1].content).passages[0].id;return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:Array.from({length:3},()=>({prompt:'white cat',source_ids:[id],anchor_source_id:id,anchor_quote:'white cat'}))})}}]}));}
+ if(!String(url).includes('generate-image'))return new Response('{}');
+ singleImages++;if(singleImages===2)return new Response('',{status:503});
+ return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
+};
+click('auto-resend');await settle();await settle();
+assert.equal(singleTags,1);assert.equal(singleImages,2);
+const retryButtons=()=>[...chatHost.querySelectorAll('.meow-inline-pending button')].filter(b=>b.textContent==='重新生这张图');
+assert.equal(retryButtons().length,2);
+retryButtons()[0].click();await settle();await settle();
+assert.equal(singleTags,1);assert.equal(singleImages,3);assert.equal(retryButtons().length,1);
+retryButtons()[0].click();await settle();await settle();
+assert.equal(singleTags,1);assert.equal(singleImages,4);assert.equal(retryButtons().length,0);
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
 $('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));

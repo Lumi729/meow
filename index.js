@@ -360,6 +360,23 @@ export async function init(){
   for(const p of payloads)await tools.withTools(p,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});
   check();
   const slots=automatic?batch.map((s,i)=>s.insertionSource?inline.placeholder(s.insertionSource,key,`第 ${i+1}/${batch.length} 张：等待生图…`):null):[];
+  const readyEntries=new Map();
+  const sourceSwipes=batch.map(s=>ctx().chat[s.insertionSource?.messageIndex]?.swipe_id??0);
+  const retryPicture=i=>run(async retrySignal=>{
+   const source=batch[i].insertionSource;
+   const verify=()=>{const message=ctx().chat[source?.messageIndex];if(retrySignal.aborted||stopping||key!==chatKey()||!message||stripInline(message.mes)!==source.messageSnapshot||(message.swipe_id??0)!==sourceSwipes[i])throw new DOMException('原文或聊天已变化，已停止','AbortError');};
+   try{
+    verify();slots[i]?.update('正在重新生成这张图…');
+    let entry=readyEntries.get(i);
+    if(!entry){
+     const src=await png(payloads[i],retrySignal);
+     entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=source;
+     entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};
+     readyEntries.set(i,entry);await addImage(entry);
+    }
+    verify();await insert(entry);slots[i]?.remove();status('这张图已完成，其他图片未重新生成。');
+   }catch(error){slots[i]?.update(error.name==='AbortError'?'已停止，可在原文未变化时重试。':`这张图未完成：${error.message}，可再次重试。`);throw error;}
+  });
   let completed=0;
   try{
    for(let i=0;i<batch.length;i++){
@@ -368,13 +385,13 @@ export async function init(){
     progress(`坏猫猫正在画第 ${i+1}/${batch.length} 张…`);
     const src=automatic?await retryAuto(attemptSignal=>png(payloads[i],attemptSignal,true),{...automatic.retry,signal,check,report:progress,label:`第 ${i+1} 张生图`,timeout:180000}):await png(payloads[i],signal);
     const entry=makeEntry(src,payloads[i],batch[i].source,batch[i].title,key);entry.insertionSource=batch[i].insertionSource;
-    entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};await addImage(entry);
+    entry.scene={prompt:batch[i].prompt,negative_prompt:batch[i].negative_prompt||'',characters:batch[i].characters||null};readyEntries.set(i,entry);await addImage(entry);
     if(automatic)check();
     if((automatic||output==='chat')&&entry.insertionSource){if(key!==chatKey())throw new Error('聊天已切换，图片已保留在图库。');await insert(entry);}
     slots[i]?.remove();completed=i+1;
     if(entry.unsaved)throw new Error('图片已返回，但图库保存失败，请及时下载。');
    }
-  }catch(error){for(let i=completed;i<slots.length;i++)slots[i]?.update(error.name==='AbortError'?'已取消生成。':`未完成：${error.message}（已有图片可在图库查看）`);throw error;}
+  }catch(error){for(let i=completed;i<slots.length;i++){slots[i]?.update(error.name==='AbortError'?'已取消生成。':`未完成：${error.message}（已有图片可在图库查看）`);slots[i]?.retry(()=>retryPicture(i));}throw error;}
   status(stopping?'已停止后续图片。':'本轮完成，图片已保存到图库。');
  };
  on('bad-generate',()=>run(runBadGenerate));
