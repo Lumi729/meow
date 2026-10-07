@@ -64,7 +64,8 @@
 
 #meow-panel .meow-drawing-params { margin:12px 0; padding:10px; border:1px solid #e8c5d3; border-radius:12px; }
 #meow-panel .meow-drawing-params summary { cursor:pointer; color:#674350; }
-.meow-message-generate,.meow-inline-actions button { background:var(--SmartThemeBlurTintColor,transparent); color:var(--SmartThemeBodyColor,inherit); border:1px solid var(--SmartThemeBorderColor,currentColor); border-radius:10px; padding:8px 10px; cursor:pointer; }
+.meow-inline-actions button { background:var(--SmartThemeBlurTintColor,transparent); color:var(--SmartThemeBodyColor,inherit); border:1px solid var(--SmartThemeBorderColor,currentColor); border-radius:10px; padding:8px 10px; cursor:pointer; }
+/* The message footer uses SillyTavern menu_button styling; only its layout belongs to Meow. */
 .meow-message-generate { display:block; margin-top:12px; }
 .meow-inline-actions { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
 #chat .meow-inline-photo { display:block; max-width:100%; max-height:65vh; object-fit:contain; touch-action:pan-y pinch-zoom; cursor:zoom-in; }
@@ -219,13 +220,13 @@ dialog.meow-gift > * { position:relative; }
 #meow-panel #meow-auto-exclusions .meow-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:6px; }
 
 /* 0.9.18: Meow UI typography is independent of the story's decorative font. */
-:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-gift,.meow-inline-card,.meow-message-generate,.meow-be-btn),
+:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-gift,.meow-inline-card,.meow-be-btn),
 :root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift,.meow-inline-card,.meow-be-btn) :not(.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands) {
  font-family:var(--meow-font-family,Arial,"Noto Sans","PingFang SC","Microsoft YaHei",sans-serif) !important;
  font-style:normal !important;
  letter-spacing:normal !important;
 }
-:root :is(#meow-dialog,#meow-panel,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-inline-card,.meow-message-generate,.meow-be-btn,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift) {
+:root :is(#meow-dialog,#meow-panel,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-inline-card,.meow-be-btn,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift) {
  font-size:var(--meow-font-size,16px) !important;
  line-height:1.5;
 }
