@@ -83,7 +83,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
   if(key!==chatKey())throw new Error('聊天已切换。');
   const message=context().chat[source.messageIndex];anchorEnd(message,source);
   const id=crypto.randomUUID(),item={source:structuredClone(source),key,message,swipe:message.swipe_id??0,title,card:null};placeholders.set(id,item);decorate();
-  return {hasRetry:()=>!!item.retry,retry(fn){item.retry=fn;item.card?.remove();item.card=null;decorate();},update(text){item.title=text;if(item.card)item.card.querySelector('[role=status]').textContent=text;},remove(){item.card?.remove();placeholders.delete(id);}};
+  return {hasRetry:()=>!!item.retry,retry(fn,label='重新生这张图'){item.retry=fn;item.retryLabel=label;item.card?.remove();item.card=null;decorate();},update(text){item.title=text;if(item.card)item.card.querySelector('[role=status]').textContent=text;},remove(){item.card?.remove();placeholders.delete(id);}};
  }
  function decorate(){
   for(const [id,item] of placeholders){
@@ -93,7 +93,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
    const body=document.querySelector(`#chat .mes[mesid="${source.messageIndex}"] .mes_text`);if(!body)continue;
    const card=document.createElement('span');card.className='meow-inline-card meow-inline-pending';
    card.style.cssText='display:block;padding:16px;margin:8px 0;border:1px dashed #bd86a0;border-radius:12px;background:#fff7fa;color:#51434a;font:14px Arial,sans-serif;';
-   const note=document.createElement('span');note.setAttribute('role','status');note.textContent=item.title;if(item.retry){const retryButton=button('重新生这张图',async()=>{if(item.retrying)return;item.retrying=true;try{await item.retry();}finally{item.retrying=false;}});retryButton.disabled=!!item.retrying;card.append(retryButton);}card.append(note,button('移除提示',()=>{card.remove();placeholders.delete(id);}));
+   const note=document.createElement('span');note.setAttribute('role','status');note.textContent=item.title;if(item.retry){const retryButton=button(item.retryLabel||'重新生这张图',async()=>{if(item.retrying)return;item.retrying=true;try{await item.retry();}finally{item.retrying=false;}});retryButton.disabled=!!item.retrying;card.append(retryButton);}card.append(note,button('移除提示',()=>{card.remove();placeholders.delete(id);}));
    let placed=placeAfterQuote(body,source.anchorText??source.text,card,source);
    if(!placed)for(const frame of body.querySelectorAll('iframe')){try{if(frame.contentDocument?.body&&placeAfterQuote(frame.contentDocument.body,source.anchorText??source.text,card,source)){placed=true;break;}}catch{}}
    if(placed)item.card=card;

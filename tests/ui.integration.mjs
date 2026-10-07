@@ -256,7 +256,7 @@ let restoredAuth='';globalThis.fetch=async(url,options)=>{assert.ok(String(url).
 field('transport','direct');field('prompt','cat');click('generate');await settle();
 assert.equal(restoredAuth,'Bearer test-only');
 // Automatic full-reply drawing filters selected tags without altering chat or manual drafts.
-assert.equal($('auto-draw').checked,false);assert.equal($('auto-image-count').value,'1');
+assert.equal($('auto-draw').checked,false);assert.equal($('auto-image-count').value,'1');assert.equal($('auto-generate-images').checked,true);
 context.chat=[{name:'Char',mes:'<正文>white cat</正文><状态栏>hidden secret</状态栏>'}];
 click('auto-exclusion-scan');
 const candidates=[...$('auto-exclusion-candidates').querySelectorAll('label')];
@@ -394,6 +394,38 @@ assert.equal($('auto-resend').disabled,false);
 // Stopping an open stream must release the busy state and schedule no new pictures.
 click('auto-resend');await settle();click('stop');await settle();await settle();
 assert.equal(streamTags,3);assert.equal(streamImages,4);assert.equal($('auto-resend').disabled,false);
+// Tags-only mode must never request an image until the user explicitly clicks.
+const imageToggle=value=>{$('auto-generate-images').checked=value;$('auto-generate-images').dispatchEvent(new Event('change'));};
+const readyButtons=()=>[...chatHost.querySelectorAll('.meow-inline-pending button')].filter(b=>b.textContent==='生成这张图');
+let toggleTags=0,toggleImages=0,holdImage=false,releaseToggleImage;
+globalThis.fetch=async(url,options)=>{
+ if(String(url).includes('chat-completions')){
+  toggleTags++;const id=JSON.parse(JSON.parse(options.body).messages[1].content).passages[0].id;
+  return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({scenes:Array.from({length:3},()=>({prompt:'white cat',source_ids:[id],anchor_source_id:id,anchor_quote:'white cat'}))})}}]}));
+ }
+ if(!String(url).includes('generate-image'))return new Response('{}');
+ toggleImages++;
+ if(holdImage){holdImage=false;return new Promise(resolve=>{releaseToggleImage=()=>resolve(new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]})));});}
+ return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
+};
+imageToggle(false);assert.equal(extensionSettings.meow_secondary.auto_generate_images,false);
+click('auto-resend');await settle();await settle();
+assert.equal(toggleTags,1);assert.equal(toggleImages,0);assert.equal(readyButtons().length,3);assert.match($('auto-draw-status').textContent,/3 张 tags 已就绪/);
+// The source-bound manual button works even if the automatic trigger is disabled.
+$('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));
+readyButtons()[0].click();await settle();await settle();
+assert.equal(toggleTags,1);assert.equal(toggleImages,1);assert.equal(readyButtons().length,2);
+imageToggle(true);await settle();assert.equal(toggleImages,1,'re-enabling must not send pending images');
+const simultaneous=readyButtons();simultaneous[0].click();simultaneous[1].click();await settle();await settle();
+assert.equal(toggleImages,2,'busy guard prevents simultaneous manual image requests');assert.equal(readyButtons().length,1);
+readyButtons()[0].click();await settle();await settle();assert.equal(toggleImages,3);assert.equal(toggleTags,1);
+// Turning the switch off mid-job lets the active image finish, deferring the rest.
+holdImage=true;click('auto-resend');await settle();assert.equal(toggleImages,4);
+imageToggle(false);imageToggle(true);releaseToggleImage();await settle();await settle();
+assert.equal(toggleImages,4);assert.equal(toggleTags,2);assert.equal(readyButtons().length,2);
+imageToggle(true);await settle();assert.equal(toggleImages,4);
+for(let i=0;i<2;i++){readyButtons()[0].click();await settle();await settle();}
+assert.equal(toggleImages,6);assert.equal(toggleTags,2);assert.equal(readyButtons().length,0);
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
 $('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));

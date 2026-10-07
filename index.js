@@ -413,6 +413,10 @@ export async function init(){
  on('auto-retries',()=>{secondary.auto_retries=numberIn(el('auto-retries').value,0,5,'自动重试次数');save();},'change');
  const autoToggle=el('auto-draw');autoToggle.checked=!!secondary.auto_draw;
  const autoStatus=message=>{el('auto-draw-status').textContent=message;status(message);};
+ let autoImagePause=0;
+ secondary.auto_generate_images??=true;
+ el('auto-generate-images').checked=secondary.auto_generate_images;
+ on('auto-generate-images',()=>{secondary.auto_generate_images=el('auto-generate-images').checked;if(!secondary.auto_generate_images)autoImagePause++;save();autoStatus(secondary.auto_generate_images?'后续自动任务收到 tags 后会排队生图；已有待生成按钮仍需手动点击。':'收到 tags 后先保留，点击正文里的“生成这张图”才发图片请求；已发出的请求继续完成。');},'change');
  const autoTargets=new Map();
  const autoDraw=mountAutoDraw({context:ctx,enabled:()=>!!secondary.auto_draw,isBusy:()=>busy,
   cancel:()=>{stopping=true;controller?.abort();},report:autoStatus,
@@ -421,7 +425,8 @@ export async function init(){
    autoTargets.set(chatKey(),{index,text:stripInline(message.mes),swipe:message.swipe_id??0});
    el('auto-raw').value='';el('auto-request').value='';
    check();if(!secondary.secret_id)throw new Error('请先配置副 API 密钥。');
-   const snapshot=stripInline(message.mes),key=chatKey();
+   const snapshot=stripInline(message.mes),key=chatKey(),sourceSwipe=message.swipe_id??0,imagePause=autoImagePause,drawAutomatically=secondary.auto_generate_images!==false;
+   const shouldDraw=()=>drawAutomatically&&secondary.auto_generate_images!==false&&imagePause===autoImagePause;
    const chosen=captureAutoContext(ctx().chat,index,readCaptureRules(),secondary.auto_exclusions);
    if(!chosen.length){autoStatus('本条回复屏蔽后没有可用正文，已跳过生图。');return;}
    const count=numberIn(secondary.auto_image_count,1,20,'自动生图数量'),withCharacters=!!secondary.character_mode;
@@ -430,7 +435,7 @@ export async function init(){
    if(JSON.stringify(request).length>150000)throw new Error('本条回复太长（请求上限 150 KB），请手动选择部分正文。');
    autoStatus('自动生图：正在把本条完整回复发送给副 API…');
    const retry={retries:numberIn(secondary.auto_retries,0,5,'自动重试次数')};
-   let accepted=0,received=0,completed=0,queue=Promise.resolve(),tagError=null;
+   let accepted=0,received=0,completed=0,waiting=0,queue=Promise.resolve(),tagError=null;
    const failures=[];
    const skipped=(error,sceneIndex)=>{
     check();received=Math.max(received,sceneIndex+1);
@@ -445,11 +450,15 @@ export async function init(){
     const slot=inline.placeholder(anchor,key,`第 ${ordinal}/${count} 张：tags 已收到，等待生图…`);
     accepted++;
     const retryOne=()=>run(async retrySignal=>{
-     const retryCheck=()=>{if(retrySignal.aborted||stopping||!valid())throw new DOMException('来源已变化或任务已停止','AbortError');};
+     const retryCheck=()=>{const latest=ctx().chat[index];if(retrySignal.aborted||stopping||key!==chatKey()||!latest||stripInline(latest.mes)!==snapshot||(latest.swipe_id??0)!==sourceSwipe)throw new DOMException('来源已变化或任务已停止','AbortError');};
      await runBadGenerate(retrySignal,{items:[item],key,check:retryCheck,valid,retry,ordinal,total:count,slots:[slot]});
     });
     queue=queue.then(async()=>{
-     try{check();await runBadGenerate(signal,{items:[item],key,check,valid,retry,ordinal,total:count,slots:[slot]});completed++;}
+     try{
+      check();
+      if(!shouldDraw()){waiting++;slot?.update(`第 ${ordinal}/${count} 张：tags 已就绪，等待手动生成。`);slot?.retry(retryOne,'生成这张图');return;}
+      await runBadGenerate(signal,{items:[item],key,check,valid,retry,ordinal,total:count,slots:[slot]});completed++;
+     }
      catch(error){
       if(signal.aborted||stopping||!valid())return;
       skipped(error,sceneIndex);
@@ -458,7 +467,7 @@ export async function init(){
       if(!slot?.hasRetry())slot?.retry(retryOne);
      }
     });
-    autoStatus(`自动 tags：已接收 ${accepted}/${count} 个完整场景，图片正在排队生成…`);
+    autoStatus(`自动 tags：已接收 ${accepted}/${count} 个完整场景，${shouldDraw()?'图片正在排队生成':'只接收 tags，等待手动生图'}…`);
    };
    try{
     await retryAuto(attemptSignal=>receiveTagStream({request,headers:ctx().getRequestHeaders(),signal:attemptSignal,
@@ -467,9 +476,11 @@ export async function init(){
    }catch(error){tagError=error;}
    // A tags failure must not cancel valid pictures already queued or in flight.
    await queue;check();
+   const waitingInfo=waiting?`另有 ${waiting} 张 tags 已就绪，点击正文里的“生成这张图”可手动生成。`:'';
    const skippedInfo=failures.length?`跳过 ${failures.length} 张（${failures.join('；')}）。`:'';
-   if(tagError)throw new Error(`${tagError.message}。已保留 ${accepted}/${count} 个场景，已完成 ${completed} 张；${skippedInfo}成功图片不会重画。`);
-   if(failures.length){autoStatus(`本轮处理结束：已完成 ${completed} 张，${skippedInfo}生图失败的占位框可单独重试；插图定位失败的场景未发送生图请求。`);return;}
+   if(tagError)throw new Error(`${tagError.message}。已保留 ${accepted}/${count} 个场景，已完成 ${completed} 张；${skippedInfo}${waitingInfo}成功图片不会重画。`);
+   if(failures.length){autoStatus(`本轮处理结束：已完成 ${completed} 张，${skippedInfo}${waitingInfo}生图失败的占位框可单独重试；插图定位失败的场景未发送生图请求。`);return;}
+   if(waiting){autoStatus(`自动 tags 接收完成，已生成 ${completed} 张图片。${waitingInfo}`);return;}
    autoStatus('本条回复自动生图完成，图片已保存到图库。');
   })});
  const resendLatest=()=>{
@@ -481,7 +492,7 @@ export async function init(){
   autoDraw.resend(index);
  };
  on('auto-resend',resendLatest);
- on('auto-draw',()=>{secondary.auto_draw=autoToggle.checked;if(!autoToggle.checked)autoDraw.reset();save();autoStatus(autoToggle.checked?'已开启：从下一条完整回复开始自动写 tags 并生图。':'自动生图已关闭。');},'change');
+ on('auto-draw',()=>{secondary.auto_draw=autoToggle.checked;if(!autoToggle.checked)autoDraw.reset();save();autoStatus(autoToggle.checked?'已开启：从下一条完整回复开始自动写 tags，是否自动生图由下方开关决定。':'自动生图已关闭。');},'change');
 
  // 书摘 bridge: selected / highlighted text → 坏猫猫 → tags → picture, after asking where the picture goes.
  const pick=document.createElement('dialog');pick.id='meow-selection-dialog';pick.setAttribute('aria-label','用猫猫星绘画这段');document.body.append(pick);
