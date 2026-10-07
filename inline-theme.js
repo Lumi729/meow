@@ -20,6 +20,10 @@ export function inlineTheme(doc, parent = doc) {
     let fontStyle = doc.getElementById('meow-inline-font-faces');
     if (fontCSS && !fontStyle) { fontStyle = doc.createElement('style'); fontStyle.id = 'meow-inline-font-faces'; doc.head.append(fontStyle); }
     if (fontStyle && fontStyle.textContent !== fontCSS) fontStyle.textContent = fontCSS;
+    const cornerCSS = parent.getElementById('meow-corner-style')?.textContent || '';
+    let cornerStyle = doc.getElementById('meow-inline-corners');
+    if (cornerCSS && !cornerStyle) { cornerStyle = doc.createElement('style'); cornerStyle.id = 'meow-inline-corners'; doc.head.append(cornerStyle); }
+    if (cornerStyle && cornerStyle.textContent !== cornerCSS) cornerStyle.textContent = cornerCSS;
     const values = parent.defaultView.getComputedStyle(parent.documentElement);
     for (const card of doc.querySelectorAll('.meow-inline-card')) for (const key of ['--SmartThemeBodyColor', '--SmartThemeChatTintColor', '--SmartThemeBlurTintColor', '--SmartThemeBorderColor', '--meow-font-family', '--meow-font-size']) {
         const value = values.getPropertyValue(key); if (card.style.getPropertyValue(key) !== value) card.style.setProperty(key, value);

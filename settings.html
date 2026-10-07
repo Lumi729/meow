@@ -105,7 +105,7 @@
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
   <div id="meow-bad-latest"></div><small>tags 可以编辑后再生成。只存相册无需插图句子匹配；插回正文时，如模型改写了句子，可在 tags 下方从原文选择准确句子。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.36</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.37</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <button id="meow-repair-inline" type="button">修复旧版正文插图并刷新</button><small>只移除旧版猫猫插图标记，保留原文和已存图片；新版本插图单独保存，不改正文代码。</small>
   </div></details>
 <details class="meow-tools meow-config-group" id="meow-config-novelai"><summary>✧ NovelAI</summary><div class="meow-config-body"><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><label><input id="meow-remember-token" type="checkbox" checked>在此浏览器记住直连 Token</label><button id="meow-forget-token" type="button">清除浏览器记忆</button><button id="meow-save-token" type="button">保存本地 Token</button>
@@ -126,6 +126,10 @@
   <p id="meow-font-status" role="status"></p><small>统一用于猫猫面板、所有弹窗、输入框和正文里的猫猫按钮。跟随正文只跟随字体，字号仍由猫猫设置；标题与说明按比例缩放。</small>
   </div></details>
 <details class="meow-tools meow-config-group" id="meow-config-theme"><summary>全局美化</summary><div class="meow-config-body"><p id="meow-theme-state" role="status"></p>
+  <h4>圆角 / 方角</h4><label><input id="meow-corners-enabled" type="checkbox">统一设置整个猫猫的圆角</label>
+  <label>圆角大小 <output id="meow-corners-value">12 px</output><input id="meow-corners-radius" type="range" min="0" max="32" step="1" value="12"></label>
+  <div class="meow-row"><button id="meow-corners-square" type="button">方角</button><button id="meow-corners-round" type="button">圆角</button><button id="meow-corners-reset" type="button">跟随原美化</button></div>
+  <p id="meow-corners-state" role="status"></p><small>0 为方角，数值越大越圆；拖动立即生效并保存。统一用于猫猫面板、按钮、输入框、弹窗与正文卡片，也包括正文底部配图按钮。关闭统一设置会恢复各处原有圆角，酒馆其他界面不受影响。</small>
   <div class="meow-row"><label class="meow-file">导入美化<input id="meow-theme-import" type="file" accept=".json,.css"></label><button id="meow-theme-export" type="button">导出美化</button><button id="meow-theme-reset" type="button">恢复默认</button></div>
   <label>已保存的美化<select id="meow-theme-select"></select></label>
   <div class="meow-row"><button id="meow-theme-save" type="button">保存美化</button><button id="meow-theme-delete" type="button">删除所选美化</button></div>
