@@ -209,6 +209,20 @@ document.querySelector('[data-page="gallery"]').click();$('gallery-filter').valu
 [...$('gallery').querySelectorAll('button')].find(b=>b.querySelector('img')?.alt===withScene.title&&b.querySelector('img').src===withScene.src)?.click()??$('gallery').querySelector('button').click();await settle();
 [...$('viewer').querySelectorAll('button')].find(b=>b.textContent.startsWith('重绘')).click();await settle();
 const sentPrompt=redrawBody.input??redrawBody.prompt;assert.ok(sentPrompt.startsWith('ink style'),sentPrompt);assert.ok(sentPrompt.includes(withScene.scene.prompt),sentPrompt);
+// The shared viewer edits structured scene/character tags, persists them and redraws without a tags API call.
+const editorButton=(scope,label)=>[...scope.querySelectorAll('button')].find(b=>b.textContent===label);
+editorButton($('viewer'),'修改 tags').click();await settle();
+let tagEditor=document.getElementById('meow-tag-editor');assert.ok(tagEditor.open);
+const editField=(label,value)=>{const input=tagEditor.querySelector(`[aria-label="${label}"]`);assert.ok(input,label);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
+editField('场景标题','编辑过的场景');editField('场景正面 tags','silver fox in garden');editField('场景负面 tags','blurry');
+while(tagEditor.querySelector('.meow-editor-person'))editorButton(tagEditor,'删除此角色').click();
+editorButton(tagEditor,'添加角色').click();editField('角色 1 名字','Fox');editField('角色 1 正面 tags','blue eyes, white hair');editField('角色 1 负面 tags','red eyes');editField('角色 1 横向位置 x','0.2');editField('角色 1 纵向位置 y','0.7');
+let editorCalls=0;globalThis.fetch=async(url,options)=>{assert.ok(!String(url).includes('chat-completions'));editorCalls++;redrawBody=JSON.parse(options.body);return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
+editorButton(tagEditor,'保存 tags').click();await settle();assert.equal(editorCalls,0);
+const editedEntry=(await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.title==='编辑过的场景');assert.ok(editedEntry);assert.equal(editedEntry.scene.characters[0].x,0.2);assert.ok(!editedEntry.payload.prompt.includes('silver fox'));
+editorButton(tagEditor,'关闭').click();editorButton($('viewer'),'修改 tags').click();await settle();assert.equal(tagEditor.querySelector('[aria-label="角色 1 正面 tags"]').value,'blue eyes, white hair');
+editorButton(tagEditor,'保存并重绘').click();await settle();await settle();assert.equal(editorCalls,1);assert.equal(tagEditor.open,false);
+assert.match(redrawBody.input??redrawBody.prompt,/silver fox/);assert.equal(redrawBody.parameters.v4_prompt.caption.char_captions[0].centers[0].x,0.2);assert.equal(redrawBody.parameters.v4_prompt.caption.char_captions[0].centers[0].y,0.7);
 // Star drawing batches stay sequential and honor Stop before the next image.
 let batchCalls=0;globalThis.fetch=async()=>{batchCalls++;if(batchCalls===2)click('stop');return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));};
 field('draw-count','20');field('prompt','cat');click('generate');await settle();await settle();assert.equal(batchCalls,2);assert.equal($('generate').disabled,false);
@@ -394,6 +408,14 @@ assert.equal($('auto-resend').disabled,false);
 // Stopping an open stream must release the busy state and schedule no new pictures.
 click('auto-resend');await settle();click('stop');await settle();await settle();
 assert.equal(streamTags,3);assert.equal(streamImages,4);assert.equal($('auto-resend').disabled,false);
+// In-story fullscreen viewer uses the same editor and synchronizes gallery metadata.
+const inlinePhoto=chatHost.querySelector('.meow-inline-photo');assert.ok(inlinePhoto);inlinePhoto.click();await settle();
+const inlineViewer=document.getElementById('meow-inline-viewer');assert.ok(inlineViewer.open);tagEditor=document.getElementById('meow-tag-editor');editorButton(inlineViewer,'修改 tags').click();await settle();assert.ok(tagEditor.open,inlineViewer.querySelector('[role=status]')?.textContent+' | '+$('status').textContent);
+editField('场景正面 tags','cat with green eyes');editorButton(tagEditor,'保存 tags').click();await settle();
+const variants=context.chat.flatMap(m=>(m.extra?.meow_inline??[]).flatMap(g=>g.variants));
+const editedInline=variants.find(v=>v.scene?.prompt==='cat with green eyes');assert.ok(editedInline);
+assert.equal((await galleryStore(extensionSettings.meow_gallery_scope).list()).find(e=>e.id===editedInline.id).scene.prompt,'cat with green eyes');
+editorButton(tagEditor,'关闭').click();editorButton(inlineViewer,'关闭').click();
 // Tags-only mode must never request an image until the user explicitly clicks.
 const imageToggle=value=>{$('auto-generate-images').checked=value;$('auto-generate-images').dispatchEvent(new Event('change'));};
 const readyButtons=()=>[...chatHost.querySelectorAll('.meow-inline-pending button')].filter(b=>b.textContent==='生成这张图');

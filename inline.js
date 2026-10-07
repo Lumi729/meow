@@ -56,7 +56,7 @@ export function placeAfterQuote(body,quote,card,source={}){
  if(highlight){const tail=doc.createRange();tail.setStart(hit.n,end-hit.start);tail.setEnd(highlight,highlight.childNodes.length);if(!tail.toString().trim()){highlight.after(card);return true;}}
  range.insertNode(card);return true;
 }
-export function mountInline({context,chatKey,upload,generate,redraw,report}){
+export function mountInline({context,chatKey,upload,generate,redraw,editTags,report}){
  const placeholders=new Map();
  let viewing=null,mutating=false;const mounted=new Map(),redrawing=new Set();
  const viewer=document.createElement('dialog');viewer.id='meow-inline-viewer';document.body.append(viewer);
@@ -68,7 +68,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
  function render(){const target=viewing;if(!target)return;const {group}=checked(target),variant=group.variants[group.active];viewer.replaceChildren();
   const photo=document.createElement('img');photo.src=variant.path;photo.alt='正文插图';photo.className='meow-inline-large';
   const counter=document.createElement('p');counter.textContent=`${group.active+1} / ${group.variants.length} · 切换会同步正文图片`;counter.setAttribute('role','status');
-  const row=document.createElement('div');row.className='meow-inline-actions';row.append(button('‹ 上一张',()=>change(target,-1)),button('下一张 ›',()=>change(target,1)),button(redrawing.has(target.id)?'正在重绘…':'重绘',()=>redrawVariant(target)),button('删除正文中的此图',()=>remove(target)),button('关闭',()=>viewer.close()));viewer.append(row,photo,counter);bindSwipe(photo,delta=>change(target,delta));
+  const row=document.createElement('div');row.className='meow-inline-actions';row.append(button('‹ 上一张',()=>change(target,-1)),button('下一张 ›',()=>change(target,1)),button(redrawing.has(target.id)?'正在重绘…':'重绘',()=>redrawVariant(target)),...(editTags?[button('修改 tags',()=>{const {group}=checked(target);return editTags(structuredClone(group.variants[group.active]),structuredClone(group.source),target.key);})]:[]),button('删除正文中的此图',()=>remove(target)),button('关闭',()=>viewer.close()));viewer.append(row,photo,counter);bindSwipe(photo,delta=>change(target,delta));
  }
  const open=target=>{checked(target);viewing=target;render();if(!viewer.open)viewer.showModal();};
  async function redrawVariant(target){if(redrawing.has(target.id))return;const {group}=checked(target);redrawing.add(target.id);decorate();if(viewing)render();try{report('正文插图正在重绘…');const entry=await redraw(structuredClone(group.variants[group.active]),group.source,target.key);if(!entry)return;checked(target);await insert(entry,[group.source]);}finally{redrawing.delete(target.id);decorate();if(viewing)render();}}
@@ -121,6 +121,17 @@ export function mountInline({context,chatKey,upload,generate,redraw,report}){
  viewer.addEventListener('close',()=>viewing=null);
  const events=context().event_types;for(const name of ['CHAT_CHANGED','MESSAGE_UPDATED','MESSAGE_SWIPED','USER_MESSAGE_RENDERED','CHARACTER_MESSAGE_RENDERED'])if(events[name])context().eventSource.on(events[name],()=>{if(name==='CHAT_CHANGED'&&viewer.open)viewer.close();decorate();});
  const chat=document.querySelector('#chat');if(chat){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;decorate();});}).observe(chat,{childList:true,subtree:true});}
- decorate();return {insert,decorate,placeholder};
+ async function updateTags(id,scene,key){
+  if(key!==chatKey())return false;
+  const changed=[];
+  for(const message of context().chat)for(const group of message.extra?.meow_inline??[])for(const variant of group.variants){
+   if(variant.id!==id)continue;changed.push({variant,scene:variant.scene,title:variant.title});variant.scene=structuredClone(scene);variant.title=scene.title;
+  }
+  if(!changed.length)return false;
+  try{await context().saveChat();}catch(error){for(const old of changed){old.variant.scene=old.scene;old.variant.title=old.title;}throw error;}
+  refresh();return true;
+ }
+ function refresh(){decorate();if(viewing)render();}
+ decorate();return {insert,decorate,placeholder,updateTags,refresh};
 }
 

@@ -229,3 +229,18 @@ dialog.meow-gift > * { position:relative; }
  font-size:16px;
  line-height:1.5;
 }
+
+/* Shared per-picture tags editor, including viewers outside the settings panel. */
+#meow-tag-editor { width:min(660px,calc(100vw - 20px)); max-height:calc(100dvh - 24px); box-sizing:border-box; overflow:auto; margin:auto; padding:18px; border:1px solid #ddb3c5; border-radius:18px; background:#fff8fb; color:#674350; font:16px/1.5 Arial,"Noto Sans","PingFang SC",sans-serif; }
+#meow-tag-editor::backdrop { background:#33223285; }
+#meow-tag-editor * { box-sizing:border-box; }
+#meow-tag-editor fieldset { border:0; padding:0; margin:0; min-width:0; }
+#meow-tag-editor label { display:block; margin:10px 0; }
+#meow-tag-editor input,#meow-tag-editor textarea { display:block; width:100%; min-width:0; margin-top:5px; padding:9px; border:1px solid #ddb3c5; border-radius:10px; color:#563643; background:#fff; font:inherit; }
+#meow-tag-editor textarea { resize:vertical; }
+#meow-tag-editor button { margin:6px 0; padding:10px 12px; border:1px solid #ddb3c5; border-radius:10px; background:#ffe6ef; color:#674350; font:inherit; cursor:pointer; }
+#meow-tag-editor button:disabled { opacity:.55; cursor:wait; }
+#meow-tag-editor .meow-editor-person { padding:12px; margin:12px 0; border:1px dashed #ddb3c5; border-radius:12px; background:#fff; }
+#meow-tag-editor .meow-editor-position { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+#meow-tag-editor .meow-editor-actions { display:flex; flex-wrap:wrap; gap:8px; position:sticky; bottom:-18px; padding:8px 0; background:#fff8fb; }
+#meow-tag-editor [role=status] { overflow-wrap:anywhere; }

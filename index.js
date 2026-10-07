@@ -1,9 +1,10 @@
+import { mountTagEditor } from './tag-editor.js';
 import { receiveTagStream } from './tag-stream.js';
 import { retryAuto } from './auto-retry.js';
 import { mountCamera } from './camera.js';
 import { tokenVault } from './credentials.js';
 import { scanAppearance, appearanceScope, mergeAppearanceScan, pruneAppearanceScan, formatAppearanceProfiles } from './appearance.js';
-import { mountInline, migrateLegacy, bindSwipe, stripInline } from './inline.js';
+import { mountInline, migrateLegacy, bindSwipe, stripInline, anchorEnd } from './inline.js';
 import { mountExcerptBridge, excerptPart } from './excerpt-bridge.js';
 import { mountGift } from './gift.js';
 import { saveSettings } from '../../../../script.js';
@@ -301,14 +302,14 @@ export async function init(){
  async function redrawEntry(entry,signal){if(entry.payload.director)throw new Error('导演工具的结果不能重绘，请对原图再用一次工具。');const payload=entry.bad||entry.scene?await redrawPayload(entry,signal):reseed(entry);status('正在重绘…');const src=await png(payload,signal);const next=makeEntry(src,payload,entry.source,entry.title,entry.chatKey);next.insertionSource=entry.insertionSource;next.cameraKey=entry.cameraKey;next.scene=entry.scene||(entry.bad?guessScene(entry.payload):null)||undefined;await addImage(next);camera?.notify(next.cameraKey);status('重绘完成，已存入图库。');return next;}
  async function removeEntry(entry){const list=viewer.open&&viewing===entry.id?viewerList().filter(x=>x.id!==entry.id):null;await store.remove(entry.id);images=images.filter(x=>x.id!==entry.id);renderGallery();renderPreviews();if(list){if(list.length)showImage(list[0].id,viewerOrigin);else viewer.close();}camera?.notify(entry.cameraKey);}
  let camera=null,tools=null;
- const inline=mountInline({context:ctx,chatKey,report:status,upload:entry=>saveBase64AsFile(entry.src.split(',')[1],'meow',entry.id,'png'),generate:index=>{if(busy)throw new Error('猫猫正在忙，请稍后再生成。');secondary.output='chat';el('output').value='chat';save();captureTarget=index;panel.open();document.querySelector('[data-page="bad"]').click();el('capture').click();},redraw:async(variant,source,key)=>{let result;await run(async signal=>{const payload=await redrawPayload(variant,signal);const src=await png(payload,signal);result=makeEntry(src,payload,[source],variant.title,key);result.scene=variant.scene||guessScene(variant.payload)||undefined;await addImage(result);});return result;}});
+ const inline=mountInline({context:ctx,chatKey,report:status,editTags:(variant,source,key)=>openImageTagEditor(images.find(x=>x.id===variant.id)||{...variant,source:[source],insertionSource:source,chatKey:key,src:variant.path},source,key),upload:entry=>saveBase64AsFile(entry.src.split(',')[1],'meow',entry.id,'png'),generate:index=>{if(busy)throw new Error('猫猫正在忙，请稍后再生成。');secondary.output='chat';el('output').value='chat';save();captureTarget=index;panel.open();document.querySelector('[data-page="bad"]').click();el('capture').click();},redraw:async(variant,source,key)=>{let result;await run(async signal=>{const original=images.find(x=>x.id===variant.id)||variant;const payload=await redrawPayload(original,signal);const src=await png(payload,signal);result=makeEntry(src,payload,[source],original.title||variant.title,key);result.scene=original.scene||guessScene(original.payload)||undefined;await addImage(result);});return result;}});
  async function insert(entry){return inline.insert(entry);}
 
  function renderViewer(entry){viewer.replaceChildren();const photo=new Image();photo.src=entry.src;photo.alt=entry.title;photo.className='meow-full-image';photo.addEventListener('click',()=>{zoom=!zoom;photo.classList.toggle('zoomed',zoom);});let touch;
  photo.addEventListener('touchstart',e=>{if(e.touches.length===1)touch={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});photo.addEventListener('touchend',e=>{if(!touch||zoom)return;const dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy))moveImage(dx<0?1:-1);touch=null;},{passive:true});
  const row=textNode('div','','meow-row');row.append(button('‹ 上一张',()=>moveImage(-1)),button('下一张 ›',()=>moveImage(1)),button('关闭',()=>viewer.close()));
  const actions=textNode('div','','meow-row');const link=document.createElement('a');link.textContent='下载 PNG';link.href=entry.src;link.download=`meow-${entry.payload.seed}.png`;const linked=(entry.insertionSource||entry.source[0])&&Number.isInteger((entry.insertionSource||entry.source[0]).messageIndex);
- actions.append(link,...(entry.payload.director?[]:[button('重绘（新种子）',()=>run(async signal=>{const next=await redrawEntry(entry,signal);showImage(next.id,viewerOrigin);}))]),...(linked?[button('插入对应原文',()=>insert(entry))]:[]),button('删除图片',async()=>{if(!confirm('删除图库中的这张图片和对应记录？已插入聊天的副本不会删除。'))return;await removeEntry(entry);}));
+ actions.append(link,button('修改 tags',()=>openImageTagEditor(entry)),...(entry.payload.director?[]:[button('重绘（新种子）',()=>run(async signal=>{const next=await redrawEntry(entry,signal);showImage(next.id,viewerOrigin);}))]),...(linked?[button('插入对应原文',()=>insert(entry))]:[]),button('删除图片',async()=>{if(!confirm('删除图库中的这张图片和对应记录？已插入聊天的副本不会删除。'))return;await removeEntry(entry);}));
  const use=textNode('details','','meow-use');use.append(textNode('summary','用这张图…（图生图 / 局部重绘 / 氛围 / 精确参考 / 反推 tags / 读信息 / 导演工具）'));const useRow=textNode('div','','meow-row');for(const [kind,label] of [['img2img','图生图'],['inpaint','局部重绘'],['vibe','氛围参考'],['reference','精确参考'],['reverse','看图反推 tags'],['meta','读原图信息'],['director','导演工具 / 放大']])useRow.append(button(label,()=>tools.useImage(entry.src,kind)));use.append(useRow);
  viewer.append(row,photo,textNode('h3',entry.title),actions,use,textNode('small',`Seed ${entry.payload.seed} · ${entry.payload.model}`));
  const prompt=textNode('details','');prompt.append(textNode('summary','实际正负提示词'),textNode('pre',`正面：${entry.payload.prompt}\n\n负面：${entry.payload.negative_prompt}`));viewer.append(prompt);
@@ -352,14 +353,42 @@ export async function init(){
  }el('scenes').append(box);});}
  // A scene = the tags written for one picture. Its payload is always rebuilt from the current 星绘 config
  // (fixed positive / negative, model, size, sampler…), so redraws follow whatever config is in use now.
- const scenePayload=(scene,base=config())=>{const cfg={...base,prompt:scene.prompt,extra_negative:combine(base.extra_negative,scene.negative_prompt)};if(!scene.characters?.length)return prepare(cfg);
+ const scenePayload=(scene,base=config())=>{if(scene.full_prompt)base={...base,fixed_positive:'',negative_prompt:'',extra_negative:''};const cfg={...base,prompt:scene.prompt,extra_negative:combine(base.extra_negative,scene.negative_prompt)};if(!scene.characters?.length)return prepare(cfg);
   const characters=validateCharacters(scene.characters),payload=buildRequest(cfg);const extra=JSON.parse(advanced.parameters||'{}');if(!extra||typeof extra!=='object'||Array.isArray(extra))throw new Error('高级 parameters 必须是对象。');payload.direct=directRequest(payload,JSON.stringify({...extra,...characterParameters(characters,advanced.model||payload.model)}),advanced.model);return payload;};
  // Pictures made before scenes were saved: peel the fixed prompts they were made with (current config or any saved preset).
- const guessScene=payload=>{const peel=(text,list)=>{text=String(text||'');for(const f of [...new Set(list.map(x=>String(x||'').trim()).filter(Boolean))].sort((a,b)=>b.length-a.length)){if(text===f)return '';if(text.startsWith(`${f}, `))return text.slice(f.length+2);}return null;};
+ const guessScene=(payload,allowFull=false)=>{const peel=(text,list)=>{text=String(text||'');for(const f of [...new Set(list.map(x=>String(x||'').trim()).filter(Boolean))].sort((a,b)=>b.length-a.length)){if(text===f)return '';if(text.startsWith(`${f}, `))return text.slice(f.length+2);}return null;};
   const fixed=[settings.fixed_positive,...ext.meow_presets.map(p=>p.settings?.fixed_positive)],negs=[settings.negative_prompt,...ext.meow_presets.map(p=>p.settings?.negative_prompt)];
-  const prompt=peel(payload.prompt,fixed);if(prompt===null)return null;
+  const prompt=peel(payload.prompt,fixed);if(prompt===null&&!allowFull)return null;
   const chars=payload.direct?.parameters?.v4_prompt?.caption?.char_captions||[],negChars=payload.direct?.parameters?.v4_negative_prompt?.caption?.char_captions||[];
-  return {prompt,negative_prompt:peel(payload.negative_prompt,negs)??'',characters:chars.filter(c=>c.char_caption).map((c,i)=>({name:`角色 ${i+1}`,prompt:c.char_caption,negative_prompt:negChars[i]?.char_caption||'',x:c.centers?.[0]?.x??0.5,y:c.centers?.[0]?.y??0.5}))};};
+  return {prompt:prompt??payload.prompt,negative_prompt:prompt===null?payload.negative_prompt:(peel(payload.negative_prompt,negs)??''),...(prompt===null?{full_prompt:true}:{}),characters:chars.filter(c=>c.char_caption).map((c,i)=>({name:`角色 ${i+1}`,prompt:c.char_caption,negative_prompt:negChars[i]?.char_caption||'',x:c.centers?.[0]?.x??0.5,y:c.centers?.[0]?.y??0.5}))};};
+ const imageTagEditor=mountTagEditor(document);
+ function openImageTagEditor(entry,inlineSource=null,inlineKey=null){
+  const originalOrigin=viewerOrigin,wasInGallery=images.some(x=>x.id===entry.id);
+  const extracted=entry.scene||guessScene(entry.payload,true)||{prompt:entry.payload.prompt||'',negative_prompt:entry.payload.negative_prompt||'',characters:null,full_prompt:true};
+  const scene={...structuredClone(extracted),title:entry.title||'未命名场景'};
+  const ensureSource=()=>{
+   if(!inlineSource)return;
+   if(inlineKey!==chatKey())throw new Error('聊天已切换，请回到原图后再修改。');
+   const message=ctx().chat[inlineSource.messageIndex];if(!message)throw new Error('来源消息已删除。');anchorEnd(message,inlineSource);
+  };
+  imageTagEditor.open({scene,onStop:()=>{stopping=true;controller?.abort();},
+   onSave:async edited=>{
+    if(busy)throw new Error('猫猫正在忙，请等当前任务结束后保存 tags。');ensureSource();
+    const current=images.find(x=>x.id===entry.id);
+    if(wasInGallery&&!current)throw new Error('这张图片已从图库删除，请重新打开图片。');
+    if(current){const next={...current,title:edited.title,scene:structuredClone(edited)};await store.put(next);Object.assign(current,next);entry=current;}
+    const synced=await inline.updateTags(entry.id,edited,entry.chatKey);
+    if(!current&&!synced)throw new Error('找不到这张图片的记录，未保存。');
+    entry.scene=structuredClone(edited);entry.title=edited.title;
+    renderGallery();renderPreviews();if(viewer.open&&viewing===entry.id)renderViewer(entry);camera?.notify(entry.cameraKey);
+   },
+   onRedraw:entry.payload.director?null:()=>run(async signal=>{
+    ensureSource();const next=await redrawEntry(entry,signal);
+    if(inlineSource){ensureSource();await inline.insert(next,[inlineSource]);inline.refresh();}
+    else showImage(next.id,originalOrigin);
+   })
+  });
+ }
  const freshSeed=payload=>{payload.seed=crypto.getRandomValues(new Uint32Array(1))[0];if(payload.direct)payload.direct.parameters.seed=payload.seed;return payload;};
  async function redrawPayload(item,signal){const scene=item.scene||guessScene(item.payload);if(!scene)return reseed(item);const payload=freshSeed(scenePayload(scene));await tools.withTools(payload,signal,{forBad:true,parameters:advanced.parameters,model:advanced.model});return payload;}
  const runBadGenerate=async (signal,automatic=null)=>{
