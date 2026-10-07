@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { Window } from 'happy-dom';
+import { mountAutoPending } from '../auto-pending.js';
+
+test('pending automatic anchors survive reload, keep manual drafts separate and guard changed sources', async () => {
+    const w = new Window(), doc = w.document;
+    globalThis.document = doc; globalThis.localStorage = w.localStorage; globalThis.Option = function (text, value) { const option = doc.createElement('option'); option.textContent = text; option.value = value; return option; };
+    doc.body.innerHTML = await fs.readFile(new URL('../settings.html', import.meta.url), 'utf8');
+    const root = doc.getElementById('meow-panel'), message = { mes: '第一句。第二句。', swipe_id: 0 }, context = { chat: [message] };
+    const source = { id: 'm0p0', messageIndex: 0, text: message.mes, anchorText: message.mes, anchorStart: 0, messageSnapshot: message.mes };
+    let key = 'a', sends = 0, error = '', editing;
+    const options = { root, scope: 'test', context: () => context, chatKey: () => key, isBusy: () => false, editTags: value => editing = value, generate: async (_, verify) => { verify(); sends++; }, report: text => error = text };
+    const app = mountAutoPending(options), item = { title: '场景', prompt: 'cat', negative_prompt: '', source: [source], source_ids: ['m0p0'], anchor_source_id: 'm0p0', anchor_quote: '模型改写过的句子' };
+    localStorage.setItem('meow-bad-drafts', 'manual stays');
+    app.add({ item, key, index: 0, snapshot: message.mes, swipe: 0, ordinal: 2, total: 3, reason: '定位失败' });
+    const click = text => [...root.querySelectorAll('#meow-auto-pending-list button')].find(b => b.textContent === text).click();
+    const settle = () => new Promise(resolve => setTimeout(resolve, 10));
+    click('生成这一张并插入'); await settle(); assert.equal(sends, 0); assert.match(error, /原文不一致/);
+    click('修改 tags'); await editing.onSave({ ...editing.scene, prompt: 'blue-eyed cat' });
+    const picker = root.querySelector('#meow-auto-pending-list select'); picker.value = '1'; picker.dispatchEvent(new w.Event('change'));
+    const restored = mountAutoPending(options); assert.equal(sends, 0, 'restoring never generates');
+    assert.equal(root.querySelector('#meow-auto-pending-list textarea').value, '第二句。');
+    assert.match(root.querySelector('#meow-auto-pending-list pre').textContent, /blue-eyed cat/);
+    key = 'b'; restored.render(); assert.equal(root.querySelectorAll('[data-pending-id]').length, 0);
+    key = 'a'; restored.render(); message.mes = '修改后的正文'; click('生成这一张并插入'); await settle(); assert.equal(sends, 0); assert.match(error, /正文已修改/);
+    message.mes = source.messageSnapshot; click('生成这一张并插入'); await settle(); assert.equal(sends, 1); assert.equal(root.querySelectorAll('[data-pending-id]').length, 0);
+    assert.equal(localStorage.getItem('meow-bad-drafts'), 'manual stays');
+    await w.happyDOM.close();
+});

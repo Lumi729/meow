@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { Window } from 'happy-dom';
-import { linkedFontCSS, mountTypography } from '../typography.js';
+import { fontAddress, linkedFontCSS, mountTypography } from '../typography.js';
 const tick = () => new Promise(resolve => setTimeout(resolve, 100));
 
 test('font CSS keeps only the chosen font, its subsets and resolved URLs', async () => {
@@ -52,4 +52,28 @@ test('all Meow surfaces share saved typography, follow story changes and reset i
         el('reset').click(); await tick(); assert.equal(ext.meow_typography.mode, 'sans'); assert.equal(el('size').value, '16');
         assert.equal(window.getComputedStyle(doc.querySelector('.mes_text')).fontFamily, 'NewStory');
     } finally { handle.destroy(); await window.happyDOM.close(); }
+});
+
+
+test('pasted import snippets are treated as font URLs and never execute body styles', async () => {
+    const window = new Window(), doc = window.document, original = globalThis.fetch;
+    doc.body.innerHTML = await fs.readFile(new URL('../settings.html', import.meta.url), 'utf8');
+    const ext = {}, handle = mountTypography(doc, ext, () => {}), el = id => doc.getElementById(`meow-font-${id}`);
+    const url = 'https://fontsapi.zeoseven.com/309/main/result.css';
+    const snippet = `@import url("${url}");\nbody { font-family: "KingHwaOldSong"; font-weight: normal; }`;
+    assert.equal(fontAddress(snippet), url); assert.equal(fontAddress(url), url);
+    assert.equal(fontAddress(`@import '${url}';`), url);
+    assert.equal(fontAddress(`@import url(${url});`), url);
+    assert.throws(() => fontAddress('not an address'), /没有识别到字体链接/);
+    let requested = '';
+    globalThis.fetch = async address => { requested = address; return new Response('@font-face{font-family:"KingHwaOldSong";src:url("./subset.woff2");font-weight:400}'); };
+    try {
+        el('mode').value = 'linked'; el('url').value = snippet; el('apply').click(); await tick();
+        assert.equal(requested, url); assert.equal(ext.meow_typography.url, url); assert.equal(el('url').value, url);
+        assert.ok(!doc.getElementById('meow-font-faces').textContent.includes('body'));
+        el('url').value = 'garbled paste'; el('apply').click(); await tick();
+        assert.match(el('status').textContent, /没有识别到字体链接/); assert.ok(!el('status').textContent.includes('跨域'));
+        assert.equal(ext.meow_typography.url, url);
+        el('kinghwa').click(); await tick(); assert.equal(el('url').value, url);
+    } finally { globalThis.fetch = original; handle.destroy(); await window.happyDOM.close(); }
 });

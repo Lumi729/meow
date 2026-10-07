@@ -1,3 +1,4 @@
+import { inlineTheme } from './inline-theme.js';
 // v0.5 stores illustrations beside message text, never inside regex/code fences.
 const pattern=/\n\n!\[Meow-([a-zA-Z0-9-]+)\]\(([^\s)]+)\)\n\n/g;
 export const stripInline=text=>String(text??'').replace(pattern,'');
@@ -57,13 +58,14 @@ export function placeAfterQuote(body,quote,card,source={}){
  range.insertNode(card);return true;
 }
 export function mountInline({context,chatKey,upload,generate,redraw,editTags,report}){
- const placeholders=new Map();
+ const placeholders=new Map();inlineTheme(document);
  let viewing=null,mutating=false;const mounted=new Map(),redrawing=new Set();
  const viewer=document.createElement('dialog');viewer.id='meow-inline-viewer';document.body.append(viewer);
- const button=(title,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=title;b.addEventListener('click',async e=>{e.stopPropagation();b.disabled=true;try{await fn();}catch(error){report(error.message);const p=b.closest('.meow-inline-card')?.querySelector('[role=status]')||viewer.querySelector('[role=status]');if(p)p.textContent=error.message;}finally{b.disabled=false;}});return b;};
+ const button=(title,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=title;b.addEventListener('click',async e=>{e.stopPropagation();b.disabled=true;try{await fn();}catch(error){report(error.message);const p=b.closest('.meow-inline-card')?.querySelector('[role=status]')||viewer.querySelector('[role=status]');if(b.closest('.meow-inline-pending'))b.closest('.meow-inline-pending').title=error.message;else if(p){p.textContent=error.message;p.hidden=false;}}finally{b.disabled=false;}});return b;};
  const checked=target=>{if(target.key!==chatKey())throw new Error('聊天已切换。');const message=context().chat[target.index],group=message?.extra?.meow_inline?.find(g=>g.id===target.id);if(!group||!active(message,group))throw new Error('原文已切换或插图不存在。');return {message,group};};
  const persist=async()=>{await context().saveChat();decorate();};
  const change=async(target,delta)=>{if(mutating)return;mutating=true;try{const {message,group}=checked(target);selectVariant(message,group,group.active+delta);await persist();if(viewing)render();}finally{mutating=false;}};
+ const toggleFold=async target=>{if(mutating)return;mutating=true;let group,previous;try{({group}=checked(target));previous=group.collapsed;group.collapsed=!group.collapsed;decorate();await context().saveChat();}catch(error){if(group){group.collapsed=previous;decorate();}throw error;}finally{mutating=false;}};
  const remove=async target=>{if(mutating)return;if(!confirm('从正文删除当前图片版本？图库原图仍保留。'))return;mutating=true;try{const {message,group}=checked(target);removeVariant(message,group);await persist();if(viewing){if(group.variants.length)render();else viewer.close();}}finally{mutating=false;}};
  function render(){const target=viewing;if(!target)return;const {group}=checked(target),variant=group.variants[group.active];viewer.replaceChildren();
   const photo=document.createElement('img');photo.src=variant.path;photo.alt='正文插图';photo.className='meow-inline-large';
@@ -79,11 +81,11 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
   const path=await upload(entry);if(key!==chatKey()||context().chat[source.messageIndex]!==message)throw new Error('上传时切换了聊天，未插入其他正文。');
   const group=attachVariant(message,source,{id:entry.id,path,payload:structuredClone(entry.payload),title:entry.title,...(entry.scene?{scene:structuredClone(entry.scene)}:{})});await persist();report(mounted.get(group.id)?.isConnected?'图片已插在标签内对应句子后，标签与折叠状态保持不变。':'图片和句子位置已保存；目标句暂未显示，显示后会插入原位，不移到楼层外。');return path;
  }
- function placeholder(source,key,title='图片生成中…'){
+ function placeholder(source,key,title='待生成图片'){
   if(key!==chatKey())throw new Error('聊天已切换。');
   const message=context().chat[source.messageIndex];anchorEnd(message,source);
   const id=crypto.randomUUID(),item={source:structuredClone(source),key,message,swipe:message.swipe_id??0,title,card:null};placeholders.set(id,item);decorate();
-  return {hasRetry:()=>!!item.retry,retry(fn,label='重新生这张图'){item.retry=fn;item.retryLabel=label;item.card?.remove();item.card=null;decorate();},update(text){item.title=text;if(item.card)item.card.querySelector('[role=status]').textContent=text;},remove(){item.card?.remove();placeholders.delete(id);}};
+  return {hasRetry:()=>!!item.retry,retry(fn,label='重新生这张图'){item.retry=fn;item.retryLabel=label;item.card?.remove();item.card=null;decorate();},update(text){item.status=text;if(item.card){item.card.title=text;if(!item.retry)item.card.querySelector('button').textContent=/重试/.test(text)?'重试中…':/正在/.test(text)?'生成中…':'等待生成';}},remove(){item.card?.remove();placeholders.delete(id);}};
  }
  function decorate(){
   for(const [id,item] of placeholders){
@@ -92,10 +94,9 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
    if(item.card?.isConnected)continue;
    const body=document.querySelector(`#chat .mes[mesid="${source.messageIndex}"] .mes_text`);if(!body)continue;
    const card=document.createElement('span');card.className='meow-inline-card meow-inline-pending';
-   card.style.cssText='display:block;padding:16px;margin:8px 0;border:1px dashed #bd86a0;border-radius:12px;background:#fff7fa;color:#51434a;font:14px Arial,sans-serif;';
-   const note=document.createElement('span');note.setAttribute('role','status');note.textContent=item.title;if(item.retry){const retryButton=button(item.retryLabel||'重新生这张图',async()=>{if(item.retrying)return;item.retrying=true;try{await item.retry();}finally{item.retrying=false;}});retryButton.disabled=!!item.retrying;card.append(retryButton);}card.append(note,button('移除提示',()=>{card.remove();placeholders.delete(id);}));
+   const note=document.createElement('span');note.setAttribute('role','status');note.textContent=item.title;card.title=item.status||'';const retryButton=button(item.retryLabel||(/正在/.test(item.status||'')?'生成中…':'等待生成'),async()=>{if(!item.retry||item.retrying)return;item.retrying=true;try{await item.retry();}finally{item.retrying=false;}});retryButton.disabled=!item.retry||!!item.retrying;card.append(note,retryButton);
    let placed=placeAfterQuote(body,source.anchorText??source.text,card,source);
-   if(!placed)for(const frame of body.querySelectorAll('iframe')){try{if(frame.contentDocument?.body&&placeAfterQuote(frame.contentDocument.body,source.anchorText??source.text,card,source)){placed=true;break;}}catch{}}
+   if(!placed)for(const frame of body.querySelectorAll('iframe')){try{if(frame.contentDocument?.body&&placeAfterQuote(frame.contentDocument.body,source.anchorText??source.text,card,source)){inlineTheme(frame.contentDocument,document);placed=true;break;}}catch{}}
    if(placed)item.card=card;
   }
   for(const [id,card] of mounted){const message=context().chat[Number(card.dataset.message)],g=message?.extra?.meow_inline?.find(x=>x.id===id);if(!card.isConnected||card.dataset.chat!==chatKey()||!g||!active(message,g)){card.remove();mounted.delete(id);}}
@@ -106,21 +107,23 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
    for(const group of groups){let card=mounted.get(group.id);const variant=group.variants[group.active];if(!variant)continue;
     if(!card){const target={key:chatKey(),index,id:group.id};card=document.createElement('span');card.className='meow-inline-card';card.dataset.message=index;card.dataset.chat=chatKey();card.dataset.group=group.id;
      const photo=document.createElement('img');photo.className='meow-inline-photo';photo.alt='正文插图';photo.addEventListener('click',()=>{if(!photo.dataset.meowSwiped)open(target);});bindSwipe(photo,delta=>change(target,delta));
-     const row=document.createElement('span');row.className='meow-inline-actions';const redrawButton=button('重绘',()=>redrawVariant(target));redrawButton.dataset.redraw='1';row.append(button('放大 / 管理',()=>open(target)),redrawButton,button('删除',()=>remove(target)),button('‹',()=>change(target,-1)),button('›',()=>change(target,1)));const note=document.createElement('span');note.setAttribute('role','status');card.append(photo,row,note);for(const node of [card,...card.querySelectorAll('*')]){node.style.setProperty('font-family','var(--meow-font-family, Arial, sans-serif)','important');node.style.setProperty('font-style','normal','important');node.style.setProperty('letter-spacing','normal','important');}
+     const heading=document.createElement('span');heading.className='meow-inline-heading';const title=document.createElement('span');title.className='meow-inline-title';const fold=button('收起图片',()=>toggleFold(target));fold.dataset.fold='1';photo.id=`meow-photo-${group.id}`;fold.setAttribute('aria-controls',photo.id);heading.append(title,fold);const note=document.createElement('span');note.setAttribute('role','status');card.append(heading,photo,note);
      let placed=placeAfterQuote(body,group.anchorText,card,group);
-     if(!placed){for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card,group)){card.style.cssText+=';display:block;color:#51434a;background:#fff7fa;padding:8px;text-align:center;';photo.style.cssText='max-width:100%;max-height:65vh;object-fit:contain;display:block;margin:0 auto;';row.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;justify-content:center;';placed=true;break;}}catch{}}}
+     if(!placed){for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card,group)){inlineTheme(frame.contentDocument,document);placed=true;break;}}catch{}}}
      if(!placed)continue;
      mounted.set(group.id,card);
     }
     const photo=card.querySelector('img');if(photo.getAttribute('src')!==variant.path)photo.src=variant.path;
-    const busy=redrawing.has(group.id),b=card.querySelector('[data-redraw]');b.disabled=busy;const label=busy?'正在重绘…':'重绘';if(b.textContent!==label)b.textContent=label;const note=card.querySelector('[role=status]'),text=busy?'正在生成新版本，请稍候…':`${group.active+1} / ${group.variants.length}`;if(note.textContent!==text)note.textContent=text;
+    const busy=redrawing.has(group.id),fold=card.querySelector('[data-fold]'),label=group.collapsed?'展开图片':'收起图片';if(fold.textContent!==label)fold.textContent=label;fold.setAttribute('aria-expanded',String(!group.collapsed));photo.hidden=!!group.collapsed;const title=card.querySelector('.meow-inline-title'),name=`${variant.title||'正文插图'}${group.variants.length>1?` · ${group.active+1}/${group.variants.length}`:''}`;if(title.textContent!==name)title.textContent=name;const note=card.querySelector('[role=status]'),text=busy?'正在生成新版本…':'';if(note.textContent!==text)note.textContent=text;note.hidden=!busy;
    }
    for(const frame of body.querySelectorAll('iframe'))if(!frame.dataset.meowLoad){frame.dataset.meowLoad='1';frame.addEventListener('load',()=>{for(const g of groups){mounted.get(g.id)?.remove();mounted.delete(g.id);}decorate();});}
   });
  }
+ const syncFrames=()=>{for(const frame of document.querySelectorAll('#chat .mes_text iframe')){try{if(frame.contentDocument?.querySelector('.meow-inline-card'))inlineTheme(frame.contentDocument,document);}catch{}}};
+ const themeObserver=new document.defaultView.MutationObserver(syncFrames);themeObserver.observe(document.documentElement,{attributes:true});themeObserver.observe(document.body,{attributes:true});themeObserver.observe(document.head,{childList:true,subtree:true,characterData:true});
  viewer.addEventListener('close',()=>viewing=null);
  const events=context().event_types;for(const name of ['CHAT_CHANGED','MESSAGE_UPDATED','MESSAGE_SWIPED','USER_MESSAGE_RENDERED','CHARACTER_MESSAGE_RENDERED'])if(events[name])context().eventSource.on(events[name],()=>{if(name==='CHAT_CHANGED'&&viewer.open)viewer.close();decorate();});
- const chat=document.querySelector('#chat');if(chat){let queued=false;new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;decorate();});}).observe(chat,{childList:true,subtree:true});}
+ const chat=document.querySelector('#chat');if(chat){let queued=false;new document.defaultView.MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;decorate();});}).observe(chat,{childList:true,subtree:true});}
  async function updateTags(id,scene,key){
   if(key!==chatKey())return false;
   const changed=[];

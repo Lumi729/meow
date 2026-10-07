@@ -64,7 +64,7 @@
 
 #meow-panel .meow-drawing-params { margin:12px 0; padding:10px; border:1px solid #e8c5d3; border-radius:12px; }
 #meow-panel .meow-drawing-params summary { cursor:pointer; color:#674350; }
-.meow-message-generate,.meow-inline-actions button { background:#fff0f6; color:#674350; border:1px solid #ddb3c5; border-radius:10px; padding:8px 10px; cursor:pointer; }
+.meow-message-generate,.meow-inline-actions button { background:var(--SmartThemeBlurTintColor,transparent); color:var(--SmartThemeBodyColor,inherit); border:1px solid var(--SmartThemeBorderColor,currentColor); border-radius:10px; padding:8px 10px; cursor:pointer; }
 .meow-message-generate { display:block; margin-top:12px; }
 .meow-inline-actions { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
 #chat .meow-inline-photo { display:block; max-width:100%; max-height:65vh; object-fit:contain; touch-action:pan-y pinch-zoom; cursor:zoom-in; }
@@ -248,3 +248,8 @@ dialog.meow-gift > * { position:relative; }
 /* Font settings remain readable on narrow screens. */
 #meow-panel #meow-font-preview { padding:12px; margin:12px 0; border:1px dashed var(--meow-border); border-radius:12px; overflow-wrap:anywhere; }
 #meow-panel #meow-font-custom-row[hidden],#meow-panel #meow-font-url-row[hidden] { display:none !important; }
+
+/* Keep per-character position guidance readable under tavern themes. */
+#meow-tag-editor small { display:block; color:#674350 !important; opacity:1 !important; font-size:.9em; line-height:1.65; }
+
+#meow-panel #meow-auto-pending pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:280px; overflow:auto; font:inherit; }

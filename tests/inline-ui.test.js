@@ -15,6 +15,8 @@ test('one image for multiple sources, local redraw, preserved code/iframe and de
  document.querySelector('.meow-message-generate').click();await settle();assert.equal(generated,0);
  await app.insert(entry('a'));await app.insert(entry('b'));await settle();assert.equal(chat[0].extra.meow_inline.length,1);assert.equal(document.querySelectorAll('.meow-inline-card').length,1);assert.equal(chat[0].mes,'1xxxx2');
  assert.equal(document.querySelector('[mesid="1"] .mes_text').innerHTML,noImage);assert.equal(body.querySelector('iframe'),frame);assert.equal(body.querySelector('pre'),code);
+ const foldButton=document.querySelector('[data-fold]');foldButton.click();await settle();assert.equal(chat[0].extra.meow_inline[0].collapsed,true);assert.equal(document.querySelector('.meow-inline-photo').hidden,true);
+ document.querySelector('.meow-inline-card').remove();app.decorate();assert.equal(document.querySelector('.meow-inline-photo').hidden,true);document.querySelector('[data-fold]').click();await settle();assert.equal(document.querySelector('.meow-inline-photo').hidden,false);
  document.querySelector('.meow-inline-photo').click();await settle();const viewer=document.querySelector('#meow-inline-viewer');assert.ok(viewer.open);
  [...viewer.querySelectorAll('button')].find(b=>b.textContent==='‹ 上一张').click();await settle();assert.ok(document.querySelector('.meow-inline-photo').src.endsWith('/a.png'));
  [...viewer.querySelectorAll('button')].find(b=>b.textContent==='重绘').click();await settle();assert.match(document.querySelector('.meow-inline-card [role=status]').textContent,/正在/);release();await settle();assert.ok(document.querySelector('.meow-inline-photo').src.endsWith('/c.png'));
@@ -41,7 +43,7 @@ test('pending illustration updates, survives rerender, becomes image and clears 
  const app=mountInline({context:()=>ctx,chatKey:()=>key,upload:async()=>'/images/test.png',generate:()=>{},redraw:()=>{},report:()=>{}});
  const source={messageIndex:0,anchorText:'句子。',anchorStart:0,messageSnapshot:message.mes};
  const slot=app.placeholder(source,key);assert.equal(document.querySelectorAll('.meow-inline-pending').length,1);
- slot.update('重试 1/2');assert.match(document.querySelector('.meow-inline-pending').textContent,/重试 1\/2/);
+ slot.update('重试 1/2');assert.equal(document.querySelector('.meow-inline-pending').title,'重试 1/2');assert.equal(document.querySelector('.meow-inline-pending').querySelectorAll('button').length,1);
  document.querySelector('.mes_text').textContent=message.mes;app.decorate();assert.equal(document.querySelectorAll('.meow-inline-pending').length,1);
  await app.insert({id:'ready',chatKey:key,payload:{},title:'pic',insertionSource:source});slot.remove();
  assert.equal(document.querySelectorAll('.meow-inline-pending').length,0);assert.equal(document.querySelectorAll('.meow-inline-photo').length,1);assert.equal(message.mes,'句子。尾句。');

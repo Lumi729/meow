@@ -3,14 +3,22 @@ export const FONT_DEFAULTS = { mode: 'sans', custom: '', url: '', size: 16 };
 const FALLBACK = 'Arial,"Noto Sans","PingFang SC","Microsoft YaHei",sans-serif';
 const FONTS = { sans: FALLBACK, serif: '"Noto Serif SC","Songti SC",SimSun,serif', kai: 'KaiTi,STKaiti,"Kaiti SC",serif', mono: 'ui-monospace,Consolas,"Microsoft YaHei",monospace' };
 const quote = value => '"' + String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\n\r\f]/g, ' ') + '"';
-const remoteURL = (value, base) => { const url = new URL(value, base); if (url.protocol !== 'https:') throw new Error('字体链接请使用 https:// 开头的地址。'); return url.href; };
+const remoteURL = (value, base) => {
+    let url; try { url = new URL(value, base); } catch { throw new Error('没有识别到字体链接，请粘贴 HTTPS 链接或完整的 @import 代码。'); }
+    if (url.protocol !== 'https:') throw new Error('字体链接请使用 https:// 开头的地址。'); return url.href;
+};
+export function fontAddress(value) {
+    const text = String(value || '').trim();
+    const imported = text.match(/@import\s+(?:url\(\s*(?:"([^"]+)"|'([^']+)'|([^\s)]+))\s*\)|"([^"]+)"|'([^']+)')/i);
+    return remoteURL(imported ? imported.slice(1).find(Boolean) : text);
+}
 export function fontSettings(value = {}) {
     value ||= {};
     const size = Number(value.size);
     return { mode: [...Object.keys(FONTS), 'follow', 'custom', 'linked'].includes(value.mode) ? value.mode : 'sans', custom: String(value.custom || '').trim().slice(0, 160), url: String(value.url || '').trim().slice(0, 4000), size: Number.isFinite(size) ? Math.min(28, Math.max(12, size)) : 16 };
 }
 export async function linkedFontCSS(doc, address) {
-    const url = remoteURL(address);
+    const url = fontAddress(address);
     if (/\.(?:woff2?|ttf|otf)$/i.test(new URL(url).pathname)) return `@font-face{font-family:"MeowLinkedFont";src:url(${quote(url)});font-display:swap;}`;
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 20000);
     try {
@@ -65,17 +73,25 @@ export function mountTypography(doc, ext, save) {
         try {
             if (next.mode === 'custom' && !next.custom) throw new Error('请填写字体名称。');
             if (next.mode === 'linked' && !next.url) throw new Error('请填写字体文件或字体 CSS 链接。');
+            if (next.mode === 'linked') next.url = fontAddress(next.url);
             const css = next.mode === 'linked' ? await linkedFontCSS(doc, next.url) : '';
             apply(next, css); ext.meow_typography = { ...current }; if (!restore) save(); fields();
             el('status').textContent = next.mode === 'follow' ? '已跟随正文字体；猫猫字号使用下方设置。' : '猫猫字体已应用，刷新后仍会保留。';
             // The browser downloads only needed Unicode subsets; never preload a whole CJK font stylesheet.
-            if (next.mode === 'linked' && doc.fonts?.load) doc.fonts.load('16px "MeowLinkedFont"', '猫猫星绘 Aa').catch(() => {
-                if (current === next) el('status').textContent = '字体文件加载失败，暂用默认字体；请检查链接是否允许跨域访问。';
-            });
-        } catch (error) { el('status').textContent = error.name === 'AbortError' ? '字体链接加载超时，请重试。' : `未应用字体：${error.message}（远程链接需允许跨域访问。）`; }
+            if (next.mode === 'linked' && doc.fonts?.load) {
+                el('status').textContent = '字体设置已保存，正在下载预览所需的字形…';
+                doc.fonts.load('16px "MeowLinkedFont"', '猫猫星绘 Aa').then(faces => {
+                    if (!faces.length) throw new Error('没有找到可用的字体声明');
+                    if (current === next) el('status').textContent = '字体已加载并应用，刷新后仍会保留。';
+                }).catch(error => {
+                    if (current === next) el('status').textContent = `字体 CSS 已载入，但字形文件加载失败：${error.message}。暂用默认字体，请检查网络或浏览器的资源拦截提示。`;
+                });
+            }
+        } catch (error) { el('status').textContent = error.name === 'AbortError' ? '字体链接加载超时，请重试。' : `未应用字体：${error.message}`; }
         finally { busy = false; el('apply').disabled = el('reset').disabled = false; }
     }
     el('mode').addEventListener('change', visibility); el('size').addEventListener('input', visibility);
+    el('kinghwa').addEventListener('click', () => { el('mode').value = 'linked'; el('url').value = 'https://fontsapi.zeoseven.com/309/main/result.css'; visibility(); commit(); });
     el('apply').addEventListener('click', () => commit()); el('reset').addEventListener('click', () => commit(true));
     fields(); variable('--meow-font-family', FALLBACK); variable('--meow-font-size', `${current.size}px`); commit(false, true);
     return { destroy: () => observer.disconnect() };

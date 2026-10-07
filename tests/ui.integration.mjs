@@ -326,7 +326,7 @@ globalThis.fetch=async(url,options)=>{
  return new Response(JSON.stringify({images:[{image:'iVBORw0KGgo='}]}));
 };
 events['generation-start']('normal');events['message-received'](0);events['generation-end']();await settle();await settle();
-assert.equal(retryImages,2);assert.equal(chatHost.querySelectorAll('.meow-inline-pending').length,2);assert.match(chatHost.textContent,/重试/);
+assert.equal(retryImages,2);assert.equal(chatHost.querySelectorAll('.meow-inline-pending').length,2);assert.ok([...chatHost.querySelectorAll('.meow-inline-pending')].every(card=>card.children.length===2&&card.querySelector('[role=status]').textContent==='cat'));
 await new Promise(resolve=>setTimeout(resolve,2200));await settle();
 assert.equal(retryTags,1);assert.equal(retryImages,4);assert.equal(chatHost.querySelectorAll('.meow-inline-pending').length,0);assert.ok(chatHost.querySelector('.meow-inline-photo'));
 assert.ok($('auto-request').value.includes('messages'));assert.ok(!$('auto-request').value.includes('secret_id'));
@@ -370,6 +370,24 @@ globalThis.fetch=async(url,options)=>{
 click('auto-resend');await settle();await settle();await settle();
 assert.equal(skippedTags,1);assert.equal(queuedImages,11);assert.equal(maxInFlight,1);assert.equal(inFlight,0);
 assert.match($('auto-draw-status').textContent,/已完成 11 张.*跳过 1 张.*第 6 张/);
+// Failed anchor scenes can be repaired without another tags request or redrawing successes.
+assert.equal($('auto-pending-list').querySelectorAll('[data-pending-id]').length,1);
+const pendingCard=()=>$('auto-pending-list').querySelector('[data-pending-id]');
+assert.match(pendingCard().textContent,/第 6 张/);
+editorButton(pendingCard(),'生成这一张并插入').click();await settle();assert.equal(queuedImages,11,'bad anchor is rejected before spending');
+tagEditor=document.getElementById('meow-tag-editor');editorButton(pendingCard(),'修改 tags').click();await settle();
+editField('场景正面 tags','orange cat repaired scene');editorButton(tagEditor,'保存 tags').click();await settle();editorButton(tagEditor,'关闭').click();
+const repairPicker=pendingCard().querySelector('select');repairPicker.value='0';repairPicker.dispatchEvent(new Event('change'));await settle();
+const pendingSaved=JSON.parse(localStorage.getItem(`meow-auto-pending:${extensionSettings.meow_gallery_scope}`));
+assert.equal(pendingSaved.length,1);assert.equal(pendingSaved[0].item.prompt,'orange cat repaired scene');assert.equal(pendingSaved[0].item.anchor_quote,'white cat');
+const normalSave=context.saveChat;context.saveChat=async()=>{throw new Error('test insert save failed');};
+editorButton(pendingCard(),'生成这一张并插入').click();await settle();await settle();
+assert.equal(skippedTags,1);assert.equal(queuedImages,12);assert.ok(pendingCard());
+assert.ok(JSON.parse(localStorage.getItem(`meow-auto-pending:${extensionSettings.meow_gallery_scope}`))[0].entryId);
+context.saveChat=normalSave;editorButton(pendingCard(),'插入已生成的图片').click();await settle();await settle();
+assert.equal(queuedImages,12,'insertion retry reuses the image already paid for');assert.equal(skippedTags,1);
+assert.equal($('auto-pending-list').querySelectorAll('[data-pending-id]').length,0);
+assert.equal(maxInFlight,1);
 $('auto-image-count').value='3';$('auto-image-count').dispatchEvent(new Event('change'));
 // Stream the first scene while the provider is still working on the second.
 let streamWriter,streamTags=0,streamImages=0,streamId,releaseStreamImage;
