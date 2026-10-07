@@ -1,6 +1,7 @@
+import {captureContext,buildTagRequest} from '../context.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {visibleAutoParts,detectAutoTags,mountAutoDraw} from '../auto-draw.js';
+import {visibleAutoParts,detectAutoTags,mountAutoDraw,captureAutoContext} from '../auto-draw.js';
 test('balanced exclusions preserve offsets, nesting, repeats and unmatched text',()=>{
  const text='a<x>secret<x>nested</x></x>b<x>other</x>c<x>open';
  const parts=visibleAutoParts(text,[{start:'<x>',end:'</x>'}]);
@@ -97,4 +98,17 @@ test('manual resend works with automatic switch off and rejects busy jobs',async
  app.resend(0);await queue.shift()();assert.equal(calls,1);
  busy=true;assert.throws(()=>app.resend(0),/等待/);busy=false;
  assert.throws(()=>app.resend(1),/找不到/);
+});
+
+test('automatic capture sends the same passages and preset as manual select-all of the current reply',()=>{
+ const chat=[{name:'Earlier',mes:'previous reply'},{name:'Cat',mes:'<正文>花园里<b>小猫</b>坐着。</正文><状态栏>晴天</状态栏>'}];
+ const manual=captureContext(chat,1).map(p=>({...p,selected:true}));
+ const auto=captureAutoContext(chat,1);
+ assert.deepEqual(auto,manual);
+ const config={url:'https://example.com/v1',model:'mock',preset:'my preset',appearance:'white cat'};
+ assert.deepEqual(buildTagRequest(config,auto,3),buildTagRequest(config,manual,3));
+ const filtered=captureAutoContext(chat,1,undefined,[{start:'<状态栏>',end:'</状态栏>'},{start:'<b>',end:'</b>'}]);
+ assert.equal(filtered.length,2);assert.equal(filtered.map(p=>p.text).join(''),'<正文>花园里坐着。</正文>');
+ for(const p of filtered){assert.equal(p.messageIndex,1);assert.equal(chat[1].mes.slice(p.anchorStart,p.anchorStart+p.text.length),p.text);}
+ assert.equal(new Set(filtered.map(p=>p.id)).size,filtered.length);
 });

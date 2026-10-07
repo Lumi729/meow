@@ -40,3 +40,14 @@ test('scan keeps people and their named extras, skips world/rule entries, always
  const names=r.records.map(x=>x.name);assert.ok(names.includes('陈野衣柜'));assert.ok(names.includes('黎千'));
  for(const junk of ['世界观','副本生成规则','待整理人物'])assert.ok(!names.includes(junk));
 });
+
+test('scene anchors tolerate unique whitespace and inline tags but reject paraphrases and ambiguity',()=>{
+ const parts=captureContext([{mes:'<正文>她走进\n<b>花园</b>。</正文>'}],1);
+ const scene={source_ids:[parts[0].id],anchor_source_id:parts[0].id,anchor_quote:'她走进花园。',anchor_occurrence:1};
+ const anchor=sceneAnchor(scene,parts);
+ assert.equal(anchor.anchorText,'她走进\n<b>花园</b>。');assert.equal(anchor.renderedText,'她走进花园。');assert.equal(anchor.excerpt,true);
+ assert.equal(parts[0].messageSnapshot.slice(anchor.anchorStart,anchor.anchorStart+anchor.anchorText.length),anchor.anchorText);
+ assert.throws(()=>sceneAnchor({...scene,anchor_quote:'她走进房间。'},parts),/不一致/);
+ const repeated=captureContext([{mes:'<正文>她走进\n花园。她走进\n花园。</正文>'}],1);
+ assert.throws(()=>sceneAnchor(scene,repeated),/不一致/);
+});

@@ -1,5 +1,5 @@
 import { stripInline } from './inline.js';
-import { balancedMessageTags } from './context.js';
+import { balancedMessageTags, captureContext } from './context.js';
 // Only new, completed assistant generations can start an automatic paid job.
 export function mountAutoDraw({context,enabled,isBusy,generate,cancel,report,schedule=fn=>setTimeout(fn,0)}){
  let pending=null,active=null,epoch=0;
@@ -65,6 +65,18 @@ export function visibleAutoParts(text,pairs=[]){
  const result=[];let cursor=0;
  for(const [a,b] of merged){if(a>cursor&&text.slice(cursor,a).trim())result.push({text:text.slice(cursor,a),start:cursor});cursor=b;}
  if(text.slice(cursor).trim())result.push({text:text.slice(cursor),start:cursor});return result;
+}
+
+// Capture the current reply exactly as manual capture does, then apply only the
+// automatic exclusions. Never read or modify the manual checkboxes/draft.
+export function captureAutoContext(chat,index,rules,pairs=[]){
+ const message=chat[index];if(!message)return [];
+ const snapshot=stripInline(message.mes),visible=visibleAutoParts(snapshot,pairs);
+ return captureContext(chat.slice(0,index+1),1,rules).flatMap(part=>{
+  const start=part.anchorStart,end=start+part.text.length;
+  const fragments=visible.map(range=>({start:Math.max(start,range.start),end:Math.min(end,range.start+range.text.length)})).filter(range=>range.end>range.start&&snapshot.slice(range.start,range.end).trim());
+  return fragments.map((range,i)=>({...part,id:fragments.length===1?part.id:`${part.id}s${i}`,selected:true,text:snapshot.slice(range.start,range.end),anchorText:snapshot.slice(range.start,range.end),anchorStart:range.start}));
+ });
 }
 
 export function mountAutoExclusions({root,settings,save,context}){

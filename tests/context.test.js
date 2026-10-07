@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {splitMessage,splitAutoMessage,captureContext,parseScenes,parseTagPreset,buildTagRequest,apiBase} from '../context.js';
+import {splitMessage,splitAutoMessage,captureContext,parseScenes,parseTagPreset,buildTagRequest,apiBase,sceneQuoteOptions,sceneAnchor} from '../context.js';
 import {buildRequest,cleanPreset} from '../core.js';
 test('context delimiters preserve excluded text, with no automatic uncategorized sharing',()=>{
  const parts=splitMessage('before<正文>main</正文><状态栏>private</状态栏>after');
@@ -89,4 +89,11 @@ test('restored manual capture keeps outer story with TimeFormat, love_letter and
  const body='<content><TimeFormat>时间</TimeFormat><love_letter>信件</love_letter><!-- Action --><image>一</image>正文<image>二</image></content>';
  const parts=captureContext([{mes:body}],1);
  assert.equal(parts.length,1);assert.equal(parts[0].text,body);assert.equal(parts[0].part,'正文');
+});
+
+test('source sentence picker preserves occurrence and binds real quotes',()=>{
+ const parts=captureContext([{mes:'<正文>小猫坐着。小猫坐着。</正文>'}],1);
+ const choices=sceneQuoteOptions(parts);assert.equal(choices.length,2);assert.deepEqual(choices.map(c=>c.occurrence),[1,2]);
+ const option=choices[1];const anchor=sceneAnchor({source_ids:[option.sourceId],anchor_source_id:option.sourceId,anchor_quote:option.quote,anchor_occurrence:option.occurrence},parts);
+ assert.equal(anchor.anchorStart,9);
 });

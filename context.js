@@ -137,14 +137,32 @@ export function sceneAnchor(scene,parts){
  if(!source||!scene.source_ids.includes(id))throw new Error('图片位置没有引用有效原文。');
  const quote=scene.anchor_quote?.trim();if(!quote||/[<>]/.test(quote))throw new Error('请填写逐字对应原文的插图句子（不要带标签）。');
  const occurrence=scene.anchor_occurrence||1;let at=-1;
- for(let i=0;i<occurrence;i++){at=source.text.indexOf(quote,at+1);if(at<0)throw new Error('插图句子与原文不一致，请重新选择句子。');}
+ for(let i=0;i<occurrence;i++){at=source.text.indexOf(quote,at+1);if(at<0)break;}
+ if(at<0&&!(occurrence===1&&excerptPart(quote,source.messageIndex,{mes:source.text})))throw new Error('插图句子与原文不一致，请从原文选择插图句子，无需重新生成 tags。');
  const offset=source.messageSnapshot?.indexOf(source.anchorText??source.text,source.anchorStart??0);
  const base=source.anchorStart??offset;if(!Number.isInteger(base)||base<0)throw new Error('原文位置失效，请重新捕捉。');
  // Edits to the preview can shorten text; locate the quote against the unchanged source anchor.
- const original=source.anchorText??source.text;let originalAt=-1;for(let i=0;i<occurrence;i++)originalAt=original.indexOf(quote,originalAt+1);
- if(originalAt<0&&source.excerpt){const mapped=excerptPart(quote,source.messageIndex,{mes:original});if(mapped)return {...source,anchorText:mapped.anchorText,anchorStart:base+mapped.anchorStart,renderedText:quote};}
+ const original=source.anchorText??source.text;let originalAt=-1;for(let i=0;i<occurrence;i++){originalAt=original.indexOf(quote,originalAt+1);if(originalAt<0)break;}
+ if(originalAt<0&&occurrence===1){const mapped=excerptPart(quote,source.messageIndex,{mes:original});if(mapped)return {...source,anchorText:mapped.anchorText,anchorStart:base+mapped.anchorStart,renderedText:quote,excerpt:true};}
  if(originalAt<0)throw new Error('这段文字经过改写，无法定位到正文。');
  return {...source,anchorText:quote,anchorStart:base+originalAt,...(source.excerpt?{renderedText:quote}:{})};
+}
+
+// Literal source sentences for correcting model paraphrases without another API call.
+export function sceneQuoteOptions(parts){
+ const options=[];
+ for(const source of parts){
+  for(const chunk of source.text.matchAll(/<[^>]*>|[^<]+|</g)){
+   if(chunk[0].startsWith('<'))continue;
+   for(const sentence of chunk[0].matchAll(/[^。！？!?\n]+[。！？!?]?/g)){
+    const quote=sentence[0].trim();if(!quote)continue;
+    const offset=chunk.index+sentence.index+sentence[0].indexOf(quote);
+    let at=-1,occurrence=0;do{at=source.text.indexOf(quote,at+1);occurrence++;}while(at>=0&&at<offset);
+    options.push({sourceId:source.id,quote,occurrence});
+   }
+  }
+ }
+ return options;
 }
 
 export const REVERSE_PROMPT='看这张图，把画面写成 NovelAI 英文 tags：人数、人物外貌（发型发色、眼睛、服装、表情、动作、姿势）、构图与镜头、场景、光线、画风。只输出用英文逗号分隔的 tags，不要解释、不要编号、不要代码块。';
@@ -156,4 +174,3 @@ export function buildReverseRequest(config,image,instruction=''){
         messages:[{role:'system',content:instruction.trim()||REVERSE_PROMPT},{role:'user',content:[{type:'text',text:'这是要反推 tags 的图片。'},{type:'image_url',image_url:{url:image}}]}]};
 }
 export const cleanTags=text=>String(text??'').trim().replace(/^```\w*\s*/,'').replace(/\s*```$/,'').replace(/\n+/g,', ').replace(/\s*,\s*(,\s*)+/g,', ').trim();
-
