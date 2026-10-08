@@ -1,3 +1,4 @@
+import { recoverChatGallery } from './gallery-recovery.js';
 import { panelThemeCSS } from './story-theme.js';
 import { mountCorners } from './corners.js';
 import { mountAutoPending } from './auto-pending.js';
@@ -48,6 +49,7 @@ export async function init(){
  const panel=mountPanel(await ctx().renderExtensionTemplateAsync(folder,'settings'),ui,save);
  const root=document.getElementById('meow-panel'),el=id=>root.querySelector(`#meow-${id}`);
  const status=message=>{el('status').textContent=message;el('tags-status').textContent=message;};
+ let galleryState='loading',galleryError='',galleryReading=false;
  const store=galleryStore(ext.meow_gallery_scope);let images=[],parts=[],scenes=[],capture=null,captureTarget=null,busy=false,controller=null,stopping=false;
  const guard=fn=>async(...args)=>{try{await fn(...args);}catch(e){status(e.name==='AbortError'?'已停止等待；已发送的任务仍可能计费，请勿立即重复提交。':e.message||'操作失败。');}};
  const on=(id,fn,event='click')=>el(id).addEventListener(event,guard(fn));
@@ -295,11 +297,29 @@ export async function init(){
  const previewIds=ext.meow_preview??={};let viewerOrigin=null;
  const previewList=mode=>images.filter(x=>mode==='bad'?x.bad&&x.chatKey===chatKey():!x.bad);
  function movePreview(mode,delta){const list=previewList(mode);if(!list.length)return;const i=list.findIndex(x=>x.id===previewIds[mode]);previewIds[mode]=list[(Math.max(0,i)+delta+list.length)%list.length].id;renderPreviews();save();}
- function renderPreviews(){for(const mode of ['draw','bad']){const box=el(mode==='draw'?'latest':'bad-latest'),list=previewList(mode);box.replaceChildren();if(!list.length){box.append(textNode('small','还没有图片，生成后会显示在这里。'));continue;}const item=list.find(x=>x.id===previewIds[mode])||list[0];previewIds[mode]=item.id;const b=button('',()=>{if(!b.dataset.meowSwiped)showImage(item.id,mode);});b.className='meow-thumb';b.setAttribute('aria-label','放大当前图片');const img=new Image();img.src=item.src;img.alt=item.title;b.append(img);bindSwipe(b,delta=>movePreview(mode,delta));const row=textNode('div','','meow-row');row.append(button('‹',()=>movePreview(mode,-1)),textNode('span',`${list.indexOf(item)+1} / ${list.length}`),button('›',()=>movePreview(mode,1)));box.append(b,row);}}
+ function renderPreviews(){for(const mode of ['draw','bad']){const box=el(mode==='draw'?'latest':'bad-latest'),list=previewList(mode);box.replaceChildren();if(!list.length){box.append(textNode('small',galleryState==='loading'?'正在读取图库…':galleryState==='error'?'图库暂未读取成功，请到图库页重试或找回。':'还没有图片，生成后会显示在这里。'));continue;}const item=list.find(x=>x.id===previewIds[mode])||list[0];previewIds[mode]=item.id;const b=button('',()=>{if(!b.dataset.meowSwiped)showImage(item.id,mode);});b.className='meow-thumb';b.setAttribute('aria-label','放大当前图片');const img=new Image();img.src=item.src;img.alt=item.title;b.append(img);bindSwipe(b,delta=>movePreview(mode,delta));const row=textNode('div','','meow-row');row.append(button('‹',()=>movePreview(mode,-1)),textNode('span',`${list.indexOf(item)+1} / ${list.length}`),button('›',()=>movePreview(mode,1)));box.append(b,row);}}
  const filtered=()=>images.filter(x=>el('gallery-filter').value==='chat'?x.chatKey===chatKey():el('gallery-filter').value==='bad'?x.bad:true);
  const thumbnail=entry=>{const b=button('',()=>showImage(entry.id));b.className='meow-thumb';b.setAttribute('aria-label',`放大预览 ${entry.title}`);const img=new Image();img.src=entry.src;img.alt=entry.title;img.loading='lazy';b.append(img);return b;};
- function renderGallery(){const grid=el('gallery');grid.replaceChildren();const list=filtered();if(!list.length)grid.append(textNode('p','还没有图片，去画一张吧。'));for(const entry of list){const card=document.createElement('article');card.append(thumbnail(entry),textNode('p',`${entry.title}${entry.unsaved?'（未持久保存）':''}`),textNode('small',new Date(entry.created).toLocaleString()));grid.append(card);}}
- on('gallery-filter',renderGallery,'change');on('gallery-refresh',async()=>{images=await store.list();renderGallery();renderPreviews();});
+ function renderGallery(){const grid=el('gallery');grid.replaceChildren();const list=filtered();if(!list.length)grid.append(textNode('p',galleryState==='loading'?'正在读取图库，请稍候…':galleryState==='error'?'图库读取未完成，不能据此判断图片丢失。请刷新图库，或从当前聊天找回图片。':images.length?'当前筛选没有匹配图片。':'图库中暂未找到图片；正文里仍有图片时可从当前聊天找回。'));for(const entry of list){const card=document.createElement('article');card.append(thumbnail(entry),textNode('p',`${entry.title}${entry.unsaved?'（未持久保存）':''}`),textNode('small',new Date(entry.created).toLocaleString()));grid.append(card);}}
+ const mergeGallery=entries=>{const map=new Map(images.map(entry=>[entry.id,entry]));for(const entry of entries)if(!map.get(entry.id)?.unsaved)map.set(entry.id,entry);images=[...map.values()].sort((a,b)=>b.created-a.created);};
+ const loadGallery=async()=>{
+  if(galleryReading)return;galleryReading=true;galleryState='loading';galleryError='';el('gallery-refresh').disabled=true;renderGallery();
+  el('gallery-state').textContent='正在逐条读取图库；图片多时需要更久，请不要清除浏览器数据。';
+  try{const entries=await store.list({onProgress:(partial,scanned)=>{mergeGallery(partial);renderGallery();renderPreviews();el('gallery-state').textContent=`正在读取：已扫描 ${scanned} 条记录，找到 ${partial.length} 张图片…`;}});mergeGallery(entries);galleryState='ready';el('gallery-state').textContent=`图库读取完成，共 ${images.length} 张图片。`;}
+  catch(error){galleryState='error';galleryError=error.message;el('gallery-state').textContent=`${galleryError} 当前仍显示已读到的 ${images.length} 张；读取失败不代表图片被删除。`;}
+  finally{galleryReading=false;el('gallery-refresh').disabled=false;renderGallery();renderPreviews();}
+ };
+ on('gallery-filter',renderGallery,'change');on('gallery-refresh',loadGallery);
+ on('gallery-recover-chat',()=>run(async signal=>{
+  if(galleryReading)throw new Error('图库仍在读取，请等读取完成或报错后再找回。');
+  const key=chatKey();if(!ctx().getCurrentChatId())throw new Error('请先打开正文里仍有图片的聊天。');
+  const check=()=>{if(key!==chatKey())throw new DOMException('聊天已切换，已停止恢复；已找回的图片保留。','AbortError');};
+  el('gallery-recover-chat').disabled=true;
+  try{const result=await recoverChatGallery({chat:ctx().chat,key,store,signal,check,onEntry:entry=>{mergeGallery([entry]);renderGallery();renderPreviews();},onProgress:count=>{el('gallery-state').textContent=`正在从当前聊天找回：新增 ${count.restored} 张，已有 ${count.existing} 张，失败 ${count.failed} 张，共 ${count.total} 张。`;}});
+   el('gallery-state').textContent=result.total?`从当前聊天找回完成：新增 ${result.restored} 张，已有 ${result.existing} 张，失败 ${result.failed} 张。${result.errors.join('；')}`:'当前聊天没有可恢复的猫猫插图记录。请打开仍能看到猫猫图片的聊天再试。';
+   status('找回过程未删除或覆盖旧图库，也没有重新生图。');
+  }finally{el('gallery-recover-chat').disabled=false;}
+ }));
  const viewer=document.createElement('dialog');viewer.id='meow-viewer';viewer.setAttribute('aria-label','图片大图预览');document.body.append(viewer);let viewing=null,zoom=false;
  const viewerList=()=>{if(viewerOrigin==='camera'){const key=images.find(x=>x.id===viewing)?.cameraKey;return images.filter(x=>x.cameraKey&&x.cameraKey===key);}return viewerOrigin?previewList(viewerOrigin):filtered();};
  function showImage(id,origin=null){const entry=images.find(x=>x.id===id);if(!entry)return;viewing=id;viewerOrigin=origin;if(origin&&origin!=='camera'){previewIds[origin]=id;renderPreviews();save();}zoom=false;renderViewer(entry);if(!viewer.open)viewer.showModal();}
@@ -580,7 +600,7 @@ export async function init(){
  const gift=mountGift({root,ext,save});new (window.MutationObserver)(()=>{if(panel.dialog.open)gift.firstOpen();}).observe(panel.dialog,{attributes:true,attributeFilter:['open']});if(panel.dialog.open)gift.firstOpen();
  mountRecovery({root,context:ctx,isBusy:()=>busy||modelsLoading,isGenerating:scriptModule.isGenerating,save});
  loadDraft();
- try{images=await store.list();renderGallery();renderPreviews();}catch{status('当前浏览器无法打开图库存储，生成后请及时下载。');}
+ await loadGallery();
 }
 ctx().eventSource.on(ctx().event_types.APP_READY,()=>init().catch(error=>{console.error('Meow initialization failed:',error);const target=document.querySelector('#meow-status')||document.querySelector('#extensions_settings2');if(target){const message=document.createElement('p');message.textContent='猫猫星绘初始化失败，请更新扩展并刷新；若仍失败，请提供浏览器控制台错误。';target.append(message);}}));
 

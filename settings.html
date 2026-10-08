@@ -74,7 +74,7 @@
    <button id="meow-tools-generate" type="button" class="meow-primary">✦ 带着这些设置去生图</button>
   </section>
  <section data-view="gallery" hidden>
-  <div class="meow-row"><h3>星星相册</h3><button id="meow-gallery-refresh" type="button">刷新图库</button></div>
+  <div class="meow-row"><h3>星星相册</h3><button id="meow-gallery-refresh" type="button">刷新图库</button><button id="meow-gallery-recover-chat" type="button">从当前聊天找回图片</button></div><p id="meow-gallery-state" role="status"></p><small>图库保存在当前浏览器中；正文插图另有酒馆文件副本。找回会读取当前聊天的猫猫插图文件并补存图库，不重新生图，不覆盖已有图片。其他聊天可分别打开后找回。</small>
   <label>筛选<select id="meow-gallery-filter"><option value="all">全部图片</option><option value="chat">当前聊天</option><option value="bad">坏猫猫图文</option></select></label>
   <small>图片和原文保存在当前浏览器中；清除网站数据会丢失。点击图片放大，左右滑动切换。</small><div id="meow-gallery" class="meow-gallery"></div>
  </section>
@@ -105,7 +105,7 @@
   <button id="meow-stop" type="button" hidden>停止后续任务</button>
   <div id="meow-bad-latest"></div><small>tags 可以编辑后再生成。只存相册无需插图句子匹配；插回正文时，如模型改写了句子，可在 tags 下方从原文选择准确句子。每张图保存它引用的原文，插图放在所选原文后，保留原文文字；切换聊天后需要重新捕捉。</small>
  </section>
- <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.42</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
+ <section data-view="config" hidden><details class="meow-tools meow-config-group" id="meow-config-update"><summary>扩展更新 · <span id="meow-version">0.9.43</span></summary><div class="meow-config-body"><p id="meow-update-state" role="status"></p><button id="meow-check-update" type="button">检查更新</button><button id="meow-update-self" type="button">更新 Meow 并刷新酒馆</button><small>只更新本扩展；成功后自动刷新整个酒馆页面。请等聊天回复完成再点。</small>
   <button id="meow-repair-inline" type="button">修复旧版正文插图并刷新</button><small>只移除旧版猫猫插图标记，保留原文和已存图片；新版本插图单独保存，不改正文代码。</small>
   </div></details>
 <details class="meow-tools meow-config-group" id="meow-config-novelai"><summary>✧ NovelAI</summary><div class="meow-config-body"><p id="meow-key-status"></p><label>Persistent API Token<input id="meow-token" type="password" autocomplete="off" placeholder="只在自己的酒馆填写"></label><label><input id="meow-remember-token" type="checkbox" checked>在此浏览器记住直连 Token</label><button id="meow-forget-token" type="button">清除浏览器记忆</button><button id="meow-save-token" type="button">保存本地 Token</button>

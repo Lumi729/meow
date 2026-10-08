@@ -162,7 +162,7 @@ const dot=document.querySelector('#meow-panel .meow-hint-dot');assert.ok(documen
 // Reverse-tag prompt restores to default and exports like the tag preset.
 field('reverse-prompt','my reverse rules');assert.equal(extensionSettings.meow_secondary.reverse_prompt,'my reverse rules');click('reverse-default');await settle();assert.notEqual($('reverse-prompt').value,'my reverse rules');
 // Global theme {name, css} applies immediately and survives in settings.
-field('theme-title','黑白画室');$('theme-css').value='#meow-panel{background:#fff}';click('theme-apply');await settle();assert.equal(document.getElementById('meow-theme-style').textContent,'#meow-panel{background:#fff}');assert.equal(extensionSettings.meow_theme.name,'黑白画室');
+field('theme-title','黑白画室');$('theme-css').value='#meow-panel{background:#fff}';click('theme-apply');await settle();assert.match(document.getElementById('meow-theme-style').textContent,/background:\s*#fff/);assert.ok(document.getElementById('meow-theme-style').textContent.includes(':not(:where(.meow-inline-card'));assert.equal(extensionSettings.meow_theme.css,'#meow-panel{background:#fff}');assert.equal(extensionSettings.meow_theme.name,'黑白画室');
 click('theme-save');await settle();
 assert.equal(extensionSettings.meow_themes.length,1);
 const firstTheme=extensionSettings.meow_themes[0].id;
@@ -466,6 +466,23 @@ assert.equal(toggleImages,4);assert.equal(toggleTags,2);assert.equal(readyButton
 imageToggle(true);await settle();assert.equal(toggleImages,4);
 for(let i=0;i<2;i++){readyButtons()[0].click();await settle();await settle();}
 assert.equal(toggleImages,6);assert.equal(toggleTags,2);assert.equal(readyButtons().length,0);
+// A gallery read error must keep loaded images, and recovery must use existing files only.
+const galleryCount=()=>$('gallery').querySelectorAll('article').length;
+const beforeReadFailure=galleryCount();assert.ok(beforeReadFailure>0);
+const normalTransaction=IDBDatabase.prototype.transaction;
+IDBDatabase.prototype.transaction=function(name,mode,...args){if(mode==='readonly')throw new Error('test gallery unavailable');return normalTransaction.call(this,name,mode,...args);};
+try{click('gallery-refresh');await settle();assert.equal(galleryCount(),beforeReadFailure);assert.match($('gallery-state').textContent,/读取失败不代表图片被删除/);}finally{IDBDatabase.prototype.transaction=normalTransaction;}
+click('gallery-refresh');await settle();assert.equal(galleryCount(),beforeReadFailure);assert.match($('gallery-state').textContent,/图库读取完成/);
+const chatBeforeRecovery=context.chat,fetchBeforeRecovery=globalThis.fetch;
+context.chat=[{mes:'recovery story',extra:{meow_inline:[{snapshot:'recovery story',source:{anchorText:'recovery story',anchorStart:0},variants:[{id:'ui-recovery-only',path:'/user/images/recover-ui.png',payload:{seed:42},title:'找回测试',scene:{prompt:'blue eyes'}}]}]}}];
+const recoverySnapshot=JSON.stringify(context.chat);let recoveryFetches=0;
+globalThis.fetch=async url=>{assert.equal(url,'/user/images/recover-ui.png','recovery must never call image generation');recoveryFetches++;return {ok:true,blob:async()=>new window.Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:'image/png'})};};
+click('gallery-recover-chat');await settle();await settle();
+assert.match($('gallery-state').textContent,/新增 1 张，已有 0 张，失败 0 张/);
+assert.equal(galleryCount(),beforeReadFailure+1);assert.equal(recoveryFetches,1);
+const recoveredEntry=await galleryStore(extensionSettings.meow_gallery_scope).get('ui-recovery-only');assert.match(recoveredEntry.src,/^data:image\/png;base64,/);assert.equal(recoveredEntry.scene.prompt,'blue eyes');assert.equal(JSON.stringify(context.chat),recoverySnapshot);
+click('gallery-recover-chat');await settle();assert.equal(recoveryFetches,1);assert.equal(galleryCount(),beforeReadFailure+1);assert.match($('gallery-state').textContent,/新增 0 张，已有 1 张，失败 0 张/);
+context.chat=chatBeforeRecovery;globalThis.fetch=fetchBeforeRecovery;
 context.chat=[];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有已有正文/);
 context.chat=[{mes:'plain'}];click('auto-exclusion-scan');assert.match($('auto-exclusion-status').textContent,/没有找到闭合标签/);
 $('auto-draw').checked=false;$('auto-draw').dispatchEvent(new Event('change'));
