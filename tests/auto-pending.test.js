@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { Window } from 'happy-dom';
 import { mountAutoPending } from '../auto-pending.js';
+import { mountInline } from '../inline.js';
 
 test('pending automatic anchors survive reload, keep manual drafts separate and guard changed sources', async () => {
     const w = new Window(), doc = w.document;
@@ -69,5 +70,67 @@ test('ready scenes restore inline without requests, survive chat/swipe changes a
     await slots.filter(s=>s.active)[0].click();
     assert.equal(sends,1,'saved image is inserted without another image request');
     assert.equal(JSON.parse(localStorage.getItem('meow-auto-pending:ready-test')).length,1);
+    await w.happyDOM.close();
+});
+
+
+test('pending cards survive a real restart using saved chat, even without browser cache or the old character index', async () => {
+    let disk, sends = 0;
+    async function boot(chat, characterId, cached) {
+        const w = new Window({url:'https://tavern.test'}), d = w.document;
+        globalThis.document = d; globalThis.localStorage = w.localStorage;
+        globalThis.Option = function(text,value){const e=d.createElement('option');e.textContent=text;e.value=value;return e;};
+        if(cached) localStorage.setItem('meow-auto-pending:restart',cached);
+        d.body.innerHTML = '<div id="chat"></div>' + await fs.readFile(new URL('../settings.html', import.meta.url),'utf8');
+        const handlers = {}, c = {chat,characterId,characters:[],getCurrentChatId:()=> 'story',event_types:{CHAT_CHANGED:'chat'},eventSource:{on(event,fn){(handlers[event]??=[]).push(fn);}},saveChat:async()=>{disk=JSON.parse(JSON.stringify(c.chat));}};
+        c.characters[characterId]={avatar:'cat.png'};
+        const key=()=>JSON.stringify([null,c.characterId,'story']);
+        const inline=mountInline({context:()=>c,chatKey:key,report:()=>{},generate:()=>{sends++;},redraw:()=>{sends++;},upload:()=>{throw new Error('no image request expected');}});
+        const app=mountAutoPending({root:d.getElementById('meow-panel'),scope:'restart',context:()=>c,chatKey:key,isBusy:()=>false,editTags:()=>{},inline,report:()=>{},generate:async(_,verify)=>{verify();sends++;}});
+        const draw=()=>{d.getElementById('chat').innerHTML=c.chat.map((m,i)=>`<div class="mes" mesid="${i}"><div class="mes_text">${m.mes}</div></div>`).join('');};
+        return {w,d,c,key,app,draw,emit:()=>{for(const fn of handlers.chat||[])fn();}};
+    }
+    const settle=()=>new Promise(r=>setTimeout(r,20));
+    const first=await boot([{mes:'她走进花园。',swipe_id:0}],0);
+    first.draw();
+    const source={id:'m0p0',messageIndex:0,text:first.c.chat[0].mes,anchorText:first.c.chat[0].mes,anchorStart:0,messageSnapshot:first.c.chat[0].mes};
+    const item={title:'花园',prompt:'garden',source:[source],source_ids:[source.id],anchor_source_id:source.id,anchor_quote:source.text};
+    first.app.add({item,key:first.key(),index:0,snapshot:source.text,swipe:0,ordinal:1,total:1,inline:true});
+    await settle();
+    assert.equal(first.d.querySelectorAll('.meow-inline-pending').length,1);
+    assert.equal(disk[0].extra.meow_pending[0].item.prompt,'garden');
+    assert.equal(disk[0].mes,source.text);
+    await first.w.happyDOM.close();
+    // New browser storage and reordered character list. The chat arrives after mount.
+    const second=await boot([],7);
+    second.c.chat=structuredClone(disk);second.emit();second.draw();await settle();
+    assert.equal(second.d.querySelectorAll('.meow-inline-pending').length,1);
+    assert.equal(sends,0,'restoring saved tags never spends on image generation');
+    // Renderer reloads message objects after its event, without another chat event.
+    second.c.chat=structuredClone(second.c.chat);second.draw();await settle();
+    assert.equal(second.d.querySelectorAll('.meow-inline-pending').length,1);
+    second.c.chat[0].mes='正文被修改';second.draw();await settle();
+    assert.equal(second.d.querySelectorAll('.meow-inline-pending').length,0);
+    second.c.chat[0].mes=source.text;second.draw();await settle();
+    assert.equal(second.d.querySelectorAll('.meow-inline-pending').length,1);
+    second.d.querySelector('.meow-inline-pending button').click();await settle();
+    assert.equal(sends,1);assert.equal(disk[0].extra.meow_pending.length,0);
+    await second.w.happyDOM.close();
+    const third=await boot(structuredClone(disk),7);third.draw();await settle();
+    assert.equal(third.d.querySelectorAll('.meow-inline-pending').length,0,'completed pending cards do not reappear after restart');
+    await third.w.happyDOM.close();
+});
+
+test('legacy browser records tolerate numeric character ID serialization and migrate to chat without requests', async()=>{
+    const w=new Window(), d=w.document;globalThis.document=d;globalThis.localStorage=w.localStorage;
+    globalThis.Option=function(text,value){const e=d.createElement('option');e.textContent=text;e.value=value;return e;};
+    d.body.innerHTML=await fs.readFile(new URL('../settings.html',import.meta.url),'utf8');
+    const message={mes:'旧正文。'},source={id:'m0p0',messageIndex:0,text:message.mes,messageSnapshot:message.mes,anchorStart:0};
+    const old={id:'old',key:JSON.stringify([null,0,'story']),index:0,snapshot:message.mes,swipe:0,inline:true,item:{prompt:'cat',source:[source],anchor_source_id:source.id,anchor_quote:source.text},ordinal:1,total:1};
+    localStorage.setItem('meow-auto-pending:legacy',JSON.stringify([old]));
+    let saves=0;const c={chat:[message],characterId:'0',characters:[{avatar:'cat.png'}],getCurrentChatId:()=> 'story',saveChat:async()=>{saves++;}};
+    const app=mountAutoPending({root:d.getElementById('meow-panel'),scope:'legacy',context:()=>c,chatKey:()=>JSON.stringify([null,'0','story']),isBusy:()=>false,editTags:()=>{},generate:()=>{throw new Error('unexpected generation');},report:()=>{}});
+    assert.equal(d.querySelectorAll('[data-pending-id]').length,1);assert.equal(message.extra.meow_pending[0].item.prompt,'cat');assert.equal(saves,1);
+    c.characters[0]={avatar:'different.png'};app.render();assert.equal(d.querySelectorAll('[data-pending-id]').length,0,'stable owner prevents matching a different character at the old index');
     await w.happyDOM.close();
 });

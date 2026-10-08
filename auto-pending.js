@@ -5,15 +5,43 @@ import { stripInline } from './inline.js';
 export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTags, generate, report, inline }) {
     const storageKey = `meow-auto-pending:${scope}`, list = root.querySelector('#meow-auto-pending-list');
     let records = [], storageError = '';
-    const slots = new Map();
-    try { const saved = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (Array.isArray(saved)) records = saved.filter(r => r?.id && r.item?.prompt && Array.isArray(r.item.source)); } catch { storageError = '旧的待处理记录无法读取。'; }
+    const slots = new Map(), hydrated = new WeakSet();
+    const validRecord = r => r?.id && typeof r.item?.prompt === 'string' && Array.isArray(r.item.source);
+    const identity = () => {
+        const c = context(), chat = c.getCurrentChatId?.();
+        if (!chat) return null;
+        const owner = c.groupId != null ? ['group', String(c.groupId)] : c.characters?.[c.characterId]?.avatar ? ['character', c.characters[c.characterId].avatar] : null;
+        return owner ? JSON.stringify([...owner, String(chat)]) : null;
+    };
+    const sameLegacyKey = key => {
+        if (key === chatKey()) return true;
+        try { const a = JSON.parse(key), b = JSON.parse(chatKey()); return Array.isArray(a) && Array.isArray(b) && a.length === 3 && b.length === 3 && a.every((v, i) => v == null ? b[i] == null : b[i] != null && String(v) === String(b[i])); } catch { return false; }
+    };
+    const belongs = r => r.owner ? r.owner === identity() : sameLegacyKey(r.key);
+    try { const saved = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (Array.isArray(saved)) records = saved.filter(validRecord); } catch { storageError = '旧的待处理记录无法读取。'; }
     const node = (tag, text = '') => { const el = document.createElement(tag); el.textContent = text; return el; };
+    let chatSaveError = '';
+    const showStorage = () => { const target = root.querySelector('#meow-auto-pending-storage'); if (target) target.textContent = [storageError, chatSaveError].filter(Boolean).join(' '); };
     const save = () => {
+        // Keep a durable copy beside the reply, just like completed illustrations.
+        const c = context(), key = chatKey();
+        for (const r of records.filter(belongs)) { r.key = key; r.owner ||= identity(); }
+        let changed = false;
+        for (const [index, message] of (c.chat || []).entries()) {
+            const saved = records.filter(r => belongs(r) && r.index === index).map(r => structuredClone(r));
+            if (!saved.length && !message.extra?.meow_pending) continue;
+            if (JSON.stringify(message.extra?.meow_pending || []) === JSON.stringify(saved)) continue;
+            message.extra ??= {}; message.extra.meow_pending = saved; changed = true;
+        }
+        if (changed && c.saveChat) {
+            try { Promise.resolve(c.saveChat()).then(() => { chatSaveError = ''; showStorage(); }, () => { chatSaveError = '待生图框未能保存到聊天，请检查酒馆连接；本地 tags 仍保留。'; showStorage(); }); }
+            catch { chatSaveError = '待生图框未能保存到聊天，请检查酒馆连接；本地 tags 仍保留。'; }
+        }
         try { localStorage.setItem(storageKey, JSON.stringify(records)); storageError = ''; }
         catch { storageError = '待处理记录暂存失败，请先处理或复制 tags；刷新后可能丢失。'; }
-        root.querySelector('#meow-auto-pending-storage').textContent = storageError;
+        showStorage();
     };
-    const exists = record => { if (!records.includes(record)) throw new Error('这组待处理 tags 已移除，请重新打开。'); if (record.key !== chatKey()) throw new Error('请切回这组 tags 的来源聊天。'); };
+    const exists = record => { if (!records.includes(record)) throw new Error('这组待处理 tags 已移除，请重新打开。'); if (!belongs(record)) throw new Error('请切回这组 tags 的来源聊天。'); };
     const verify = record => {
         exists(record); const message = context().chat[record.index];
         if (!message || stripInline(message.mes) !== record.snapshot || (message.swipe_id ?? 0) !== record.swipe) throw new Error('来源正文已修改或切换版本，不能插回旧位置；已保留 tags。');
@@ -32,14 +60,40 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
             remove(record); report('这张图已完成；其他图片和 tags 没有重新生成。');
         } catch (error) { record.reason = error.message; save(); render(); throw error; }
     }
+    function hydrate() {
+        let changed = false;
+        for (const [index, message] of (context().chat || []).entries()) {
+            if (hydrated.has(message)) continue;
+            hydrated.add(message);
+            for (const saved of Array.isArray(message.extra?.meow_pending) ? message.extra.meow_pending : []) {
+                if (!validRecord(saved)) continue;
+                let record = records.find(r => r.id === saved.id && belongs(r));
+                if (!record) {
+                    record = structuredClone(saved);
+                    if (records.some(r => r.id === record.id)) record.id = crypto.randomUUID();
+                    records.push(record);
+                }
+                const oldIndex = record.index;
+                record.key = chatKey(); record.owner = identity(); record.index = index;
+                for (const source of record.item.source) if (source.messageIndex === oldIndex) source.messageIndex = index;
+                changed = true;
+            }
+            // Upgrade old browser-only records without changing message text.
+            if (records.some(r => belongs(r) && r.index === index)) changed = true;
+        }
+        for (const record of records) if (belongs(record) && record.key !== chatKey()) { record.key = chatKey(); changed = true; }
+        if (changed) save();
+    }
     function restoreInline() {
+        hydrate();
         if (!inline) return;
         for (const record of records) {
             // Recreate handles after a chat switch, message edit or reply branch change.
-            if (!record.inline || record.key !== chatKey()) { slots.get(record.id)?.remove(); slots.delete(record.id); continue; }
+            if (!record.inline || !belongs(record)) { slots.get(record.id)?.remove(); slots.delete(record.id); continue; }
             try {
                 verify(record);
                 if (slots.get(record.id)?.alive()) continue;
+                slots.get(record.id)?.remove(); slots.delete(record.id);
                 const anchor = sceneAnchor(record.item, record.item.source);
                 const slot = inline.placeholder(anchor, record.key, record.item.title || `第 ${record.ordinal} 张图片`);
                 slot.update(record.reason || 'tags 已保存，等待手动生成。');
@@ -50,9 +104,9 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     }
     function render() {
         restoreInline();
-        list.replaceChildren(); const visible = records.filter(r => r.key === chatKey());
+        list.replaceChildren(); const visible = records.filter(belongs);
         root.querySelector('#meow-auto-pending-count').textContent = `${visible.length} 张`;
-        root.querySelector('#meow-auto-pending-storage').textContent = storageError;
+        showStorage();
         if (!visible.length) { list.append(node('p', '没有未完成的场景。')); return; }
         for (const record of visible) {
             const box = node('section'); box.className = 'meow-source'; box.dataset.pendingId = record.id;
@@ -82,9 +136,18 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     for (const name of ['CHAT_CHANGED', 'MESSAGE_UPDATED', 'MESSAGE_SWIPED', 'USER_MESSAGE_RENDERED', 'CHARACTER_MESSAGE_RENDERED']) {
         if (events[name]) context().eventSource.on(events[name], restoreInline);
     }
+    // The chat renderer may replace message objects after its initial event.
+    const chat = document.querySelector('#chat');
+    if (chat) {
+        let queued = false;
+        new document.defaultView.MutationObserver(() => {
+            if (queued) return; queued = true;
+            queueMicrotask(() => { queued = false; restoreInline(); });
+        }).observe(chat, { childList: true, subtree: true });
+    }
     render();
     return {
-        add(data) { const record = { ...structuredClone(data), id: crypto.randomUUID() }; records.push(record); save(); render(); root.querySelector('#meow-auto-pending').open = true; return record; },
+        add(data) { hydrate(); const record = { ...structuredClone(data), owner: identity(), id: crypto.randomUUID() }; records.push(record); save(); render(); root.querySelector('#meow-auto-pending').open = true; return record; },
         render, remove, resume,
         slot: record => slots.get(record.id),
         entry(record, entry) { record.entryId = entry.id; save(); },
