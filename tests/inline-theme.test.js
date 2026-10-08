@@ -22,3 +22,16 @@ test('story cards use live tavern colors and scoped theme styles also reach ifra
     assert.equal(doc.querySelector('#story').textContent, '原文'); assert.equal(framed.querySelector('p').textContent, '框内原文');
     await w.happyDOM.close();
 });
+
+test('story controls stay horizontal under narrow tavern button rules without replacing colors', async () => {
+    const w = new Window(), doc = w.document;
+    doc.body.innerHTML = '<span class="meow-inline-card"><span class="meow-inline-heading"><span class="meow-inline-title">场景</span><button class="menu_button">收起图片</button></span></span><button class="menu_button" id="panel">面板按钮</button>';
+    const style = doc.createElement('style');
+    style.textContent = '.menu_button {width:1em; writing-mode:vertical-rl; white-space:normal; color:rgb(12, 34, 56); border-radius:9px;}';doc.head.append(style);
+    inlineTheme(doc);
+    const css = w.getComputedStyle(doc.querySelector('.meow-inline-card button'));
+    assert.equal(css.width,'auto'); assert.equal(css.writingMode,'horizontal-tb'); assert.equal(css.whiteSpace,'nowrap');
+    assert.equal(css.color,'rgb(12, 34, 56)');assert.equal(css.borderRadius,'9px');
+    assert.equal(w.getComputedStyle(doc.getElementById('panel')).width,'16px');
+    await w.happyDOM.close();
+});

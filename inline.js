@@ -85,7 +85,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
   if(key!==chatKey())throw new Error('聊天已切换。');
   const message=context().chat[source.messageIndex];anchorEnd(message,source);
   const id=crypto.randomUUID(),item={source:structuredClone(source),key,message,swipe:message.swipe_id??0,title,card:null};placeholders.set(id,item);decorate();
-  return {hasRetry:()=>!!item.retry,retry(fn,label='重新生这张图'){item.retry=fn;item.retryLabel=label;item.card?.remove();item.card=null;decorate();},update(text){item.status=text;if(item.card){item.card.title=text;if(!item.retry)item.card.querySelector('button').textContent=/重试/.test(text)?'重试中…':/正在/.test(text)?'生成中…':'等待生成';}},remove(){item.card?.remove();placeholders.delete(id);}};
+  return {alive:()=>placeholders.has(id),hasRetry:()=>!!item.retry,retry(fn,label='重新生这张图'){item.retry=fn;item.retryLabel=label;item.card?.remove();item.card=null;decorate();},update(text){item.status=text;if(item.card){item.card.title=text;if(!item.retry)item.card.querySelector('button').textContent=/重试/.test(text)?'重试中…':/正在/.test(text)?'生成中…':'等待生成';}},remove(){item.card?.remove();placeholders.delete(id);}};
  }
  function decorate(){
   for(const [id,item] of placeholders){

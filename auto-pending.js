@@ -2,9 +2,10 @@ import { sceneAnchor, sceneQuoteOptions } from './context.js';
 import { stripInline } from './inline.js';
 
 // Independent of the manual Bad Cat draft. Never sends tags or images on restore.
-export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTags, generate, report }) {
+export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTags, generate, report, inline }) {
     const storageKey = `meow-auto-pending:${scope}`, list = root.querySelector('#meow-auto-pending-list');
     let records = [], storageError = '';
+    const slots = new Map();
     try { const saved = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (Array.isArray(saved)) records = saved.filter(r => r?.id && r.item?.prompt && Array.isArray(r.item.source)); } catch { storageError = '旧的待处理记录无法读取。'; }
     const node = (tag, text = '') => { const el = document.createElement(tag); el.textContent = text; return el; };
     const save = () => {
@@ -19,11 +20,40 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     };
     const button = (text, fn) => { const el = node('button', text); el.type = 'button'; el.addEventListener('click', async () => { try { await fn(); } catch (error) { report(error.message); } }); return el; };
     const idle = record => { exists(record); if (isBusy()) throw new Error('猫猫正在忙，请等当前任务结束后处理。'); };
+    function remove(record) {
+        slots.get(record.id)?.remove(); slots.delete(record.id);
+        records = records.filter(r => r !== record); save(); render();
+    }
+    async function resume(record) {
+        idle(record);
+        try {
+            verify(record); sceneAnchor(record.item, record.item.source);
+            await generate(record, () => verify(record), entry => { record.entryId = entry.id; save(); });
+            remove(record); report('这张图已完成；其他图片和 tags 没有重新生成。');
+        } catch (error) { record.reason = error.message; save(); render(); throw error; }
+    }
+    function restoreInline() {
+        if (!inline) return;
+        for (const record of records) {
+            // Recreate handles after a chat switch, message edit or reply branch change.
+            if (!record.inline || record.key !== chatKey()) { slots.get(record.id)?.remove(); slots.delete(record.id); continue; }
+            try {
+                verify(record);
+                if (slots.get(record.id)?.alive()) continue;
+                const anchor = sceneAnchor(record.item, record.item.source);
+                const slot = inline.placeholder(anchor, record.key, record.item.title || `第 ${record.ordinal} 张图片`);
+                slot.update(record.reason || 'tags 已保存，等待手动生成。');
+                slot.retry(() => resume(record), record.entryId ? '插入已生成图片' : '生成这张图');
+                slots.set(record.id, slot);
+            } catch { slots.get(record.id)?.remove(); slots.delete(record.id); /* Keep tags for explicit repair. */ }
+        }
+    }
     function render() {
+        restoreInline();
         list.replaceChildren(); const visible = records.filter(r => r.key === chatKey());
         root.querySelector('#meow-auto-pending-count').textContent = `${visible.length} 张`;
         root.querySelector('#meow-auto-pending-storage').textContent = storageError;
-        if (!visible.length) { list.append(node('p', '没有待修正位置的场景。')); return; }
+        if (!visible.length) { list.append(node('p', '没有未完成的场景。')); return; }
         for (const record of visible) {
             const box = node('section'); box.className = 'meow-source'; box.dataset.pendingId = record.id;
             box.append(node('h4', `第 ${record.index + 1} 条回复 · 第 ${record.ordinal} 张 · ${record.item.title || '未命名场景'}`), node('p', record.reason));
@@ -37,27 +67,26 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
             picker.addEventListener('change', () => {
                 try { idle(record); if (picker.value === '') return; const choice = options[Number(picker.value)];
                     Object.assign(record.item, { anchor_source_id: choice.sourceId, anchor_quote: choice.quote, anchor_occurrence: choice.occurrence });
-                    sceneAnchor(record.item, record.item.source); quote.value = choice.quote; record.reason = '已修正位置，可单独生成并插入。'; save(); render();
+                    sceneAnchor(record.item, record.item.source); quote.value = choice.quote; record.reason = '已修正位置，可单独生成并插入。'; record.inline = true; slots.get(record.id)?.remove(); slots.delete(record.id); save(); render();
                 } catch (error) { report(error.message); render(); }
             });
             box.append(node('label', '重新选择插图位置（不会重新请求 tags）'), picker, quote);
             const actions = node('div'); actions.className = 'meow-row';
             actions.append(button('修改 tags', () => { idle(record); editTags({ scene: record.item, onRedraw: null, onSave: async edited => {
-                idle(record); record.item = structuredClone(edited); delete record.entryId; save(); render();
-            } }); }), button(record.entryId ? '插入已生成的图片' : '生成这一张并插入', async () => {
-                idle(record);
-                try {
-                    verify(record); sceneAnchor(record.item, record.item.source);
-                    await generate(record, () => verify(record), entry => { record.entryId = entry.id; save(); });
-                    records = records.filter(r => r !== record); save(); render(); report('这张图已完成；其他图片和 tags 没有重新生成。');
-                } catch (error) { record.reason = error.message; save(); render(); throw error; }
-            }), button('移除这组待处理 tags', () => { idle(record); if (!confirm('移除这组待处理 tags？已生成的图库图片不会删除。')) return; records = records.filter(r => r !== record); save(); render(); }));
+                idle(record); record.item = structuredClone(edited); delete record.entryId; slots.get(record.id)?.remove(); slots.delete(record.id); save(); render();
+            } }); }), button(record.entryId ? '插入已生成的图片' : '生成这一张并插入', () => resume(record)), button('移除这组待处理 tags', () => { idle(record); if (!confirm('移除这组待处理 tags？已生成的图库图片不会删除。')) return; remove(record); }));
             box.append(actions); list.append(box);
         }
+    }
+    const events = context().event_types || {};
+    for (const name of ['CHAT_CHANGED', 'MESSAGE_UPDATED', 'MESSAGE_SWIPED', 'USER_MESSAGE_RENDERED', 'CHARACTER_MESSAGE_RENDERED']) {
+        if (events[name]) context().eventSource.on(events[name], restoreInline);
     }
     render();
     return {
         add(data) { const record = { ...structuredClone(data), id: crypto.randomUUID() }; records.push(record); save(); render(); root.querySelector('#meow-auto-pending').open = true; return record; },
-        render,
+        render, remove, resume,
+        slot: record => slots.get(record.id),
+        entry(record, entry) { record.entryId = entry.id; save(); },
     };
 }

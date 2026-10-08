@@ -452,7 +452,7 @@ export async function init(){
  secondary.auto_generate_images??=true;
  el('auto-generate-images').checked=secondary.auto_generate_images;
  on('auto-generate-images',()=>{secondary.auto_generate_images=el('auto-generate-images').checked;if(!secondary.auto_generate_images)autoImagePause++;save();autoStatus(secondary.auto_generate_images?'后续自动任务收到 tags 后会排队生图；已有待生成按钮仍需手动点击。':'收到 tags 后先保留，点击正文里的“生成这张图”才发图片请求；已发出的请求继续完成。');},'change');
- const autoPending=mountAutoPending({root,scope:ext.meow_gallery_scope,context:ctx,chatKey,isBusy:()=>busy,editTags:options=>imageTagEditor.open(options),report:autoStatus,
+ const autoPending=mountAutoPending({inline,root,scope:ext.meow_gallery_scope,context:ctx,chatKey,isBusy:()=>busy,editTags:options=>imageTagEditor.open(options),report:autoStatus,
   generate:(record,verify,onEntry)=>run(async signal=>{
    const check=()=>{signal.throwIfAborted();if(stopping)throw new DOMException('已停止','AbortError');verify();};check();
    const anchor=sceneAnchor(record.item,record.item.source),existing=record.entryId&&images.find(entry=>entry.id===record.entryId);
@@ -492,24 +492,22 @@ export async function init(){
     try { anchor=sceneAnchor(item,item.source); } // Validate before spending on an image.
     catch(error){autoPending.add({item,key,index,snapshot,swipe:sourceSwipe,ordinal:sceneIndex+1,total:count,reason:error.message});throw error;}
     const ordinal=sceneIndex+1;
-    const slot=inline.placeholder(anchor,key,item.title||`第 ${ordinal} 张图片`);
+    const pending=autoPending.add({item,key,index,snapshot,swipe:sourceSwipe,ordinal,total:count,inline:true,reason:'tags 已保存，等待生成。'});
+    const slot=autoPending.slot(pending);
     accepted++;
-    const retryOne=()=>run(async retrySignal=>{
-     const retryCheck=()=>{const latest=ctx().chat[index];if(retrySignal.aborted||stopping||key!==chatKey()||!latest||stripInline(latest.mes)!==snapshot||(latest.swipe_id??0)!==sourceSwipe)throw new DOMException('来源已变化或任务已停止','AbortError');};
-     await runBadGenerate(retrySignal,{items:[item],key,check:retryCheck,valid,retry,ordinal,total:count,slots:[slot]});
-    });
+    const retryOne=()=>autoPending.resume(pending);
     queue=queue.then(async()=>{
      try{
       check();
       if(!shouldDraw()){waiting++;slot?.update(`第 ${ordinal}/${count} 张：tags 已就绪，等待手动生成。`);slot?.retry(retryOne,'生成这张图');return;}
-      await runBadGenerate(signal,{items:[item],key,check,valid,retry,ordinal,total:count,slots:[slot]});completed++;
+      await runBadGenerate(signal,{items:[item],key,check,valid,retry,ordinal,total:count,slots:[slot],onEntry:entry=>autoPending.entry(pending,entry)});autoPending.remove(pending);completed++;
      }
      catch(error){
       if(signal.aborted||stopping||!valid())return;
       skipped(error,sceneIndex);
       slot?.update(`这张图未完成：${error.message}`);
-      // runBadGenerate installs its cached-image retry when preparation succeeded.
-      if(!slot?.hasRetry())slot?.retry(retryOne);
+      // Use the persisted record, including any already-saved image, for retries.
+      slot?.retry(retryOne);
      }
     });
     autoStatus(`自动 tags：已接收 ${accepted}/${count} 个完整场景，${shouldDraw()?'图片正在排队生成':'只接收 tags，等待手动生图'}…`);
