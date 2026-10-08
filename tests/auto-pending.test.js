@@ -5,6 +5,46 @@ import { Window } from 'happy-dom';
 import { mountAutoPending } from '../auto-pending.js';
 import { mountInline } from '../inline.js';
 
+test('deleting an earlier reply keeps pending tags on their original message and survives restart', async () => {
+    const w = new Window(), d = w.document;
+    globalThis.document=d; globalThis.localStorage=w.localStorage;
+    globalThis.Option=function(text,value){const e=d.createElement('option');e.textContent=text;e.value=value;return e;};
+    d.body.innerHTML=await fs.readFile(new URL('../settings.html',import.meta.url),'utf8');
+    const before={mes:'前一条。'}, message={mes:'她走进花园。'}, after={mes:'后面一条。'};
+    const c={chat:[before,message,after],saveChat:async()=>{}};
+    const options={root:d.getElementById('meow-panel'),scope:'move',context:()=>c,chatKey:()=> 'chat',isBusy:()=>false,editTags:()=>{},generate:async(_,verify)=>verify(),report:()=>{}};
+    const app=mountAutoPending(options);
+    const source={id:'m1p0',messageIndex:1,text:message.mes,anchorText:message.mes,anchorStart:0,messageSnapshot:message.mes};
+    const record=app.add({key:'chat',index:1,snapshot:message.mes,swipe:0,ordinal:1,item:{prompt:'garden',source:[source],source_ids:[source.id],anchor_source_id:source.id,anchor_quote:message.mes}});
+    c.chat.splice(0,1);app.render();
+    assert.equal(record.index,0,'pending scene follows its message after earlier deletion');
+    app.entry(record,{id:'already-generated'});
+    assert.equal(message.extra.meow_pending[0].entryId,'already-generated');
+    assert.equal(after.extra?.meow_pending?.length||0,0,'never attach pending tags to the next reply');
+    c.chat=structuredClone(c.chat);app.entry(record,{id:'newly-saved'});
+    assert.equal(c.chat[0].extra.meow_pending[0].entryId,'newly-saved','save can run before a renderer reload event');
+    localStorage.clear();mountAutoPending(options);
+    assert.equal(d.querySelectorAll('[data-pending-id]').length,1,'chat alone retains the record');
+    assert.match(d.querySelector('[data-pending-id] h4').textContent,/第 1 条/);
+    await w.happyDOM.close();
+});
+
+test('deleted source never lends its pending record to an identical replacement reply', async()=>{
+    const w=new Window(),d=w.document;globalThis.document=d;globalThis.localStorage=w.localStorage;
+    globalThis.Option=function(text,value){const e=d.createElement('option');e.textContent=text;e.value=value;return e;};
+    d.body.innerHTML=await fs.readFile(new URL('../settings.html',import.meta.url),'utf8');
+    const message={mes:'同一句正文。'},replacement={mes:message.mes},c={chat:[message,replacement],saveChat:async()=>{}};
+    let sends=0;
+    const app=mountAutoPending({root:d.getElementById('meow-panel'),scope:'deleted',context:()=>c,chatKey:()=> 'chat',isBusy:()=>false,editTags:()=>{},generate:async(_,verify)=>{verify();sends++;},report:()=>{}});
+    const source={id:'m0p0',messageIndex:0,text:message.mes,anchorStart:0,messageSnapshot:message.mes};
+    const record=app.add({key:'chat',index:0,snapshot:message.mes,swipe:0,item:{prompt:'cat',source:[source],source_ids:[source.id],anchor_source_id:source.id,anchor_quote:message.mes}});
+    c.chat.splice(0,1);app.entry(record,{id:'saved'});app.render();
+    assert.equal(replacement.extra?.meow_pending?.length||0,0);
+    await assert.rejects(app.resume(record),/来源正文/);assert.equal(sends,0);
+    assert.equal(JSON.parse(localStorage.getItem('meow-auto-pending:deleted'))[0].item.prompt,'cat','retain tags for manual recovery');
+    await w.happyDOM.close();
+});
+
 test('pending automatic anchors survive reload, keep manual drafts separate and guard changed sources', async () => {
     const w = new Window(), doc = w.document;
     globalThis.document = doc; globalThis.localStorage = w.localStorage; globalThis.Option = function (text, value) { const option = doc.createElement('option'); option.textContent = text; option.value = value; return option; };

@@ -5,7 +5,7 @@ import { stripInline } from './inline.js';
 export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTags, generate, report, inline }) {
     const storageKey = `meow-auto-pending:${scope}`, list = root.querySelector('#meow-auto-pending-list');
     let records = [], storageError = '';
-    const slots = new Map(), hydrated = new WeakSet();
+    const slots = new Map(), hydrated = new WeakSet(), messages = new Map();
     const validRecord = r => r?.id && typeof r.item?.prompt === 'string' && Array.isArray(r.item.source);
     const identity = () => {
         const c = context(), chat = c.getCurrentChatId?.();
@@ -18,17 +18,29 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
         try { const a = JSON.parse(key), b = JSON.parse(chatKey()); return Array.isArray(a) && Array.isArray(b) && a.length === 3 && b.length === 3 && a.every((v, i) => v == null ? b[i] == null : b[i] != null && String(v) === String(b[i])); } catch { return false; }
     };
     const belongs = r => r.owner ? r.owner === identity() : sameLegacyKey(r.key);
+    const relocate = () => {
+        const chat = context().chat || [];
+        for (const record of records.filter(belongs)) {
+            const message = messages.get(record.id), index = message ? chat.indexOf(message) : -1;
+            if (index < 0 || index === record.index) continue;
+            const previous = record.index; record.index = index;
+            for (const source of record.item.source) if (source.messageIndex === previous) source.messageIndex = index;
+        }
+    };
     try { const saved = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (Array.isArray(saved)) records = saved.filter(validRecord); } catch { storageError = '旧的待处理记录无法读取。'; }
     const node = (tag, text = '') => { const el = document.createElement(tag); el.textContent = text; return el; };
     let chatSaveError = '';
     const showStorage = () => { const target = root.querySelector('#meow-auto-pending-storage'); if (target) target.textContent = [storageError, chatSaveError].filter(Boolean).join(' '); };
     const save = () => {
+        hydrate(false);
+        relocate();
         // Keep a durable copy beside the reply, just like completed illustrations.
         const c = context(), key = chatKey();
         for (const r of records.filter(belongs)) { r.key = key; r.owner ||= identity(); }
         let changed = false;
         for (const [index, message] of (c.chat || []).entries()) {
-            const saved = records.filter(r => belongs(r) && r.index === index).map(r => structuredClone(r));
+            const saved = records.filter(r => belongs(r) && r.index === index &&
+                (messages.has(r.id) ? messages.get(r.id) === message : stripInline(message.mes) === r.snapshot)).map(r => structuredClone(r));
             if (!saved.length && !message.extra?.meow_pending) continue;
             if (JSON.stringify(message.extra?.meow_pending || []) === JSON.stringify(saved)) continue;
             message.extra ??= {}; message.extra.meow_pending = saved; changed = true;
@@ -44,13 +56,14 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     const exists = record => { if (!records.includes(record)) throw new Error('这组待处理 tags 已移除，请重新打开。'); if (!belongs(record)) throw new Error('请切回这组 tags 的来源聊天。'); };
     const verify = record => {
         exists(record); const message = context().chat[record.index];
-        if (!message || stripInline(message.mes) !== record.snapshot || (message.swipe_id ?? 0) !== record.swipe) throw new Error('来源正文已修改或切换版本，不能插回旧位置；已保留 tags。');
+        if (!message || messages.has(record.id) && messages.get(record.id) !== message || stripInline(message.mes) !== record.snapshot || (message.swipe_id ?? 0) !== record.swipe) throw new Error('来源正文已修改或切换版本，不能插回旧位置；已保留 tags。');
     };
     const button = (text, fn) => { const el = node('button', text); el.type = 'button'; el.addEventListener('click', async () => { try { await fn(); } catch (error) { report(error.message); } }); return el; };
     const idle = record => { exists(record); if (isBusy()) throw new Error('猫猫正在忙，请等当前任务结束后处理。'); };
     function remove(record) {
         slots.get(record.id)?.remove(); slots.delete(record.id);
         records = records.filter(r => r !== record); save(); render();
+        messages.delete(record.id);
     }
     async function resume(record) {
         idle(record);
@@ -60,7 +73,7 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
             remove(record); report('这张图已完成；其他图片和 tags 没有重新生成。');
         } catch (error) { record.reason = error.message; save(); render(); throw error; }
     }
-    function hydrate() {
+    function hydrate(persist = true) {
         let changed = false;
         for (const [index, message] of (context().chat || []).entries()) {
             if (hydrated.has(message)) continue;
@@ -74,17 +87,21 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
                     records.push(record);
                 }
                 const oldIndex = record.index;
+                messages.set(record.id, message);
                 record.key = chatKey(); record.owner = identity(); record.index = index;
                 for (const source of record.item.source) if (source.messageIndex === oldIndex) source.messageIndex = index;
                 changed = true;
             }
             // Upgrade old browser-only records without changing message text.
-            if (records.some(r => belongs(r) && r.index === index)) changed = true;
+            for (const record of records.filter(r => belongs(r) && r.index === index && !messages.has(r.id) && stripInline(message.mes) === r.snapshot)) {
+                messages.set(record.id, message); changed = true;
+            }
         }
         for (const record of records) if (belongs(record) && record.key !== chatKey()) { record.key = chatKey(); changed = true; }
-        if (changed) save();
+        if (changed && persist) save();
     }
     function restoreInline() {
+        relocate();
         hydrate();
         if (!inline) return;
         for (const record of records) {
@@ -147,7 +164,7 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     }
     render();
     return {
-        add(data) { hydrate(); const record = { ...structuredClone(data), owner: identity(), id: crypto.randomUUID() }; records.push(record); save(); render(); root.querySelector('#meow-auto-pending').open = true; return record; },
+        add(data) { hydrate(); const record = { ...structuredClone(data), owner: identity(), id: crypto.randomUUID() }; records.push(record); const message = context().chat?.[record.index]; if (message) messages.set(record.id, message); save(); render(); root.querySelector('#meow-auto-pending').open = true; return record; },
         render, remove, resume,
         slot: record => slots.get(record.id),
         entry(record, entry) { record.entryId = entry.id; save(); },

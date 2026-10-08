@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Window} from 'happy-dom';
 import {mountInline,placeAfterQuote} from '../inline.js';
+
+test('message generate button uses the current message number after earlier messages are removed', async()=>{
+ const w=new Window();globalThis.document=w.document;
+ document.body.innerHTML='<div id="chat"><div class="mes" mesid="1"><div class="mes_text">保留正文。</div></div></div>';
+ const c={chat:[{mes:'删除正文。'},{mes:'保留正文。'}],event_types:{},eventSource:{on(){}}};let target;
+ const app=mountInline({context:()=>c,chatKey:()=> 'chat',generate:i=>target=i,report:()=>{}});
+ c.chat.splice(0,1);document.querySelector('.mes').setAttribute('mesid','0');app.decorate();
+ document.querySelector('.meow-message-generate').click();
+ assert.equal(target,0);
+ await w.happyDOM.close();
+});
 test('one image for multiple sources, local redraw, preserved code/iframe and deletable variants',async()=>{
  const window=new Window({url:'https://local.test'});globalThis.document=window.document;globalThis.MutationObserver=window.MutationObserver;globalThis.confirm=()=>true;
  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};

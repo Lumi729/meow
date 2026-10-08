@@ -111,11 +111,14 @@ export function mountAutoExclusions({root,settings,save,context}){
  root.querySelector('#meow-auto-exclusion-add').addEventListener('click',()=>{settings.auto_exclusions.push({start:'',end:''});save();render();});render();
 }
 
-// Exclusion choices deliberately include nested pairs; manual capture stays outermost.
+// Only suggest outer custom sections. Keep previously selected exclusions intact.
+const HTML_TAGS = new Set(('html head body title base link meta style script noscript template slot div span p br hr a b i u s em strong small sub sup mark del ins abbr address article aside audio video source track canvas caption cite code col colgroup data datalist dd details dfn dialog dl dt embed fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup iframe img input kbd label legend li main map menu meter nav object ol optgroup option output picture pre progress q rp rt ruby samp search section select summary table tbody td textarea tfoot th thead time tr ul var wbr button font center big strike tt frameset frame noframes param area svg math').split(' '));
 export function detectAutoTags(value){
- const text=String(value??''),pairs=[],seen=new Set();
+ const text=String(value??''),pairs=[],seen=new Set();let end=0;
  const ranges=balancedMessageTags(text).sort((a,b)=>a.a-b.a||b.b-a.b);
  for(const range of ranges){
+  if(HTML_TAGS.has(range.name.toLowerCase())||range.a<end)continue;
+  end=range.b;
   const pair={start:text.slice(range.a,range.openEnd),end:text.slice(range.closeStart,range.b)};
   const key=JSON.stringify(pair);if(!seen.has(key)){seen.add(key);pairs.push(pair);}
  }

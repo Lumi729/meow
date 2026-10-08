@@ -1,4 +1,5 @@
 import { recoverChatGallery } from './gallery-recovery.js';
+import { galleryForChat } from './gallery-context.js';
 import { panelThemeCSS } from './story-theme.js';
 import { mountCorners } from './corners.js';
 import { mountAutoPending } from './auto-pending.js';
@@ -295,10 +296,10 @@ export async function init(){
   status(`已完成 ${completed}/${count} 张，图片已保存到图库。`);
  }));
  const previewIds=ext.meow_preview??={};let viewerOrigin=null;
- const previewList=mode=>images.filter(x=>mode==='bad'?x.bad&&x.chatKey===chatKey():!x.bad);
+ const previewList=mode=>mode==='bad'?galleryForChat(images,ctx().chat,chatKey()).filter(x=>x.bad):images.filter(x=>!x.bad);
  function movePreview(mode,delta){const list=previewList(mode);if(!list.length)return;const i=list.findIndex(x=>x.id===previewIds[mode]);previewIds[mode]=list[(Math.max(0,i)+delta+list.length)%list.length].id;renderPreviews();save();}
  function renderPreviews(){for(const mode of ['draw','bad']){const box=el(mode==='draw'?'latest':'bad-latest'),list=previewList(mode);box.replaceChildren();if(!list.length){box.append(textNode('small',galleryState==='loading'?'正在读取图库…':galleryState==='error'?'图库暂未读取成功，请到图库页重试或找回。':'还没有图片，生成后会显示在这里。'));continue;}const item=list.find(x=>x.id===previewIds[mode])||list[0];previewIds[mode]=item.id;const b=button('',()=>{if(!b.dataset.meowSwiped)showImage(item.id,mode);});b.className='meow-thumb';b.setAttribute('aria-label','放大当前图片');const img=new Image();img.src=item.src;img.alt=item.title;b.append(img);bindSwipe(b,delta=>movePreview(mode,delta));const row=textNode('div','','meow-row');row.append(button('‹',()=>movePreview(mode,-1)),textNode('span',`${list.indexOf(item)+1} / ${list.length}`),button('›',()=>movePreview(mode,1)));box.append(b,row);}}
- const filtered=()=>images.filter(x=>el('gallery-filter').value==='chat'?x.chatKey===chatKey():el('gallery-filter').value==='bad'?x.bad:true);
+ const filtered=()=>el('gallery-filter').value==='chat'?galleryForChat(images,ctx().chat,chatKey()):images.filter(x=>el('gallery-filter').value==='bad'?x.bad:true);
  const thumbnail=entry=>{const b=button('',()=>showImage(entry.id));b.className='meow-thumb';b.setAttribute('aria-label',`放大预览 ${entry.title}`);const img=new Image();img.src=entry.src;img.alt=entry.title;img.loading='lazy';b.append(img);return b;};
  function renderGallery(){const grid=el('gallery');grid.replaceChildren();const list=filtered();if(!list.length)grid.append(textNode('p',galleryState==='loading'?'正在读取图库，请稍候…':galleryState==='error'?'图库读取未完成，不能据此判断图片丢失。请刷新图库，或从当前聊天找回图片。':images.length?'当前筛选没有匹配图片。':'图库中暂未找到图片；正文里仍有图片时可从当前聊天找回。'));for(const entry of list){const card=document.createElement('article');card.append(thumbnail(entry),textNode('p',`${entry.title}${entry.unsaved?'（未持久保存）':''}`),textNode('small',new Date(entry.created).toLocaleString()));grid.append(card);}}
  const mergeGallery=entries=>{const map=new Map(images.map(entry=>[entry.id,entry]));for(const entry of entries)if(!map.get(entry.id)?.unsaved)map.set(entry.id,entry);images=[...map.values()].sort((a,b)=>b.created-a.created);};
@@ -476,7 +477,7 @@ export async function init(){
   generate:(record,verify,onEntry)=>run(async signal=>{
    const check=()=>{signal.throwIfAborted();if(stopping)throw new DOMException('已停止','AbortError');verify();};check();
    const anchor=sceneAnchor(record.item,record.item.source),existing=record.entryId&&images.find(entry=>entry.id===record.entryId);
-   if(existing){await inline.insert(existing,[anchor]);check();return;}
+   if(existing){await inline.insert({...existing,chatKey:record.key},[anchor]);check();return;}
    if(record.entryId)throw new Error('已生成图片不在图库中；请先保存 tags，再重新生成这一张。');
    await runBadGenerate(signal,{items:[record.item],key:record.key,check,retry:{retries:numberIn(secondary.auto_retries,0,5,'自动重试次数')},ordinal:record.ordinal,total:record.total,slots:[null],onEntry});
   })});
