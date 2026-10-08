@@ -1,5 +1,5 @@
 // A scoped override: only Meow surfaces receive the chosen corner radius.
-const SURFACES = '#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-floating,#meow-top-button,#meow-wand-entry,#meow-wand-button,.meow-gift,.meow-inline-card,.meow-message-generate,.meow-be-btn';
+const SURFACES = '#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-floating,#meow-top-button,#meow-wand-entry,#meow-wand-button,.meow-gift,.meow-be-btn';
 export function mountCorners(doc, ext, save) {
     const el = id => doc.getElementById(`meow-corners-${id}`);
     const stored = ext.meow_corners || {}, value = Number(stored.radius ?? 12);

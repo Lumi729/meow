@@ -1,3 +1,4 @@
+import { panelThemeCSS } from './story-theme.js';
 import { mountCorners } from './corners.js';
 import { mountAutoPending } from './auto-pending.js';
 import { mountTypography } from './typography.js';
@@ -176,7 +177,7 @@ export async function init(){
 #meow-viewer { }                                   /* 大图查看 */
 #meow-gallery-picker, #meow-mask-editor { }        /* 选图 / 画蒙版窗口 */
 #meow-floating { }                                 /* 悬浮按钮 */
-.meow-inline-card { }                              /* 正文里的插图卡片 */
+/* 正文按钮跟随酒馆美化，不应用猫猫美化。 */
 `;
  const themeStyle=document.getElementById('meow-theme-style')||Object.assign(document.createElement('style'),{id:'meow-theme-style'});document.head.append(themeStyle);
  const cleanCss=css=>{css=String(css??'');if(css.length>500000)throw new Error('CSS 太大（上限 500 KB）。');if(/<\/?style|<script/i.test(css))throw new Error('CSS 里不能有 <style> 或 <script> 标签。');return css;};
@@ -187,7 +188,7 @@ export async function init(){
   for(const t of ext.meow_themes)select.add(new Option(t.name,t.id));
   select.value=ext.meow_theme_id||'';el('theme-delete').disabled=!select.value;
  };
- const applyTheme=()=>{themeStyle.textContent=ext.meow_theme.css||'';el('theme-title').value=ext.meow_theme.name||'';el('theme-css').value=ext.meow_theme.css||'';el('theme-state').textContent=ext.meow_theme.css?`当前美化：${ext.meow_theme.name||'未命名'}`:'当前是默认样式';renderThemes();};
+ const applyTheme=()=>{themeStyle.textContent=panelThemeCSS(document,ext.meow_theme.css);el('theme-title').value=ext.meow_theme.name||'';el('theme-css').value=ext.meow_theme.css||'';el('theme-state').textContent=ext.meow_theme.css?`当前美化：${ext.meow_theme.name||'未命名'}`:'当前是默认样式';renderThemes();};
  const setTheme=(name,css,id='')=>{ext.meow_theme={name:String(name||'').slice(0,80),css:cleanCss(css)};ext.meow_theme_id=id;save();applyTheme();};
  const keepTheme=(name,css,imported=false)=>{
   name=String(name||'').trim().slice(0,80);css=cleanCss(css);

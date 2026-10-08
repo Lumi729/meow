@@ -94,7 +94,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
    if(item.card?.isConnected)continue;
    const body=document.querySelector(`#chat .mes[mesid="${source.messageIndex}"] .mes_text`);if(!body)continue;
    const card=document.createElement('span');card.className='meow-inline-card meow-inline-pending';
-   const note=document.createElement('span');note.setAttribute('role','status');note.textContent=item.title;card.title=item.status||'';const retryButton=button(item.retryLabel||(/正在/.test(item.status||'')?'生成中…':'等待生成'),async()=>{if(!item.retry||item.retrying)return;item.retrying=true;try{await item.retry();}finally{item.retrying=false;}});retryButton.disabled=!item.retry||!!item.retrying;card.append(note,retryButton);
+   const note=document.createElement('span');note.setAttribute('role','status');note.textContent=item.title;card.title=item.status||'';const retryButton=button(item.retryLabel||(/正在/.test(item.status||'')?'生成中…':'等待生成'),async()=>{if(!item.retry||item.retrying)return;item.retrying=true;try{await item.retry();}finally{item.retrying=false;}});retryButton.disabled=!item.retry||!!item.retrying;retryButton.classList.add('menu_button');card.append(note,retryButton);
    let placed=placeAfterQuote(body,source.anchorText??source.text,card,source);
    if(!placed)for(const frame of body.querySelectorAll('iframe')){try{if(frame.contentDocument?.body&&placeAfterQuote(frame.contentDocument.body,source.anchorText??source.text,card,source)){inlineTheme(frame.contentDocument,document);placed=true;break;}}catch{}}
    if(placed)item.card=card;
@@ -107,7 +107,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
    for(const group of groups){let card=mounted.get(group.id);const variant=group.variants[group.active];if(!variant)continue;
     if(!card){const target={key:chatKey(),index,id:group.id};card=document.createElement('span');card.className='meow-inline-card';card.dataset.message=index;card.dataset.chat=chatKey();card.dataset.group=group.id;
      const photo=document.createElement('img');photo.className='meow-inline-photo';photo.alt='正文插图';photo.addEventListener('click',()=>{if(!photo.dataset.meowSwiped)open(target);});bindSwipe(photo,delta=>change(target,delta));
-     const heading=document.createElement('span');heading.className='meow-inline-heading';const title=document.createElement('span');title.className='meow-inline-title';const fold=button('收起图片',()=>toggleFold(target));fold.dataset.fold='1';photo.id=`meow-photo-${group.id}`;fold.setAttribute('aria-controls',photo.id);heading.append(title,fold);const note=document.createElement('span');note.setAttribute('role','status');card.append(heading,photo,note);
+     const heading=document.createElement('span');heading.className='meow-inline-heading';const title=document.createElement('span');title.className='meow-inline-title';const fold=button('收起图片',()=>toggleFold(target));fold.classList.add('menu_button');fold.dataset.fold='1';photo.id=`meow-photo-${group.id}`;fold.setAttribute('aria-controls',photo.id);heading.append(title,fold);const note=document.createElement('span');note.setAttribute('role','status');card.append(heading,photo,note);
      let placed=placeAfterQuote(body,group.anchorText,card,group);
      if(!placed){for(const frame of body.querySelectorAll('iframe')){try{const frameBody=frame.contentDocument?.body;if(frameBody&&placeAfterQuote(frameBody,group.anchorText,card,group)){inlineTheme(frame.contentDocument,document);placed=true;break;}}catch{}}}
      if(!placed)continue;

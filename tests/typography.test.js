@@ -35,11 +35,12 @@ test('all Meow surfaces share saved typography, follow story changes and reset i
         const roots = ['meow-viewer', 'meow-inline-viewer', 'meow-tag-editor', 'meow-selection-dialog', 'meow-mask-editor', 'meow-gallery-picker'];
         for (const id of roots) { const dialog = doc.createElement('dialog'); dialog.id = id; dialog.innerHTML = '<button>按钮</button><textarea>tags</textarea>'; doc.body.append(dialog); }
         const inline = doc.createElement('span'); inline.className = 'meow-inline-card'; inline.innerHTML = '<button>正文猫猫按钮</button>'; doc.querySelector('.mes_text').append(inline);
-        for (const node of [doc.getElementById('meow-panel'), ...roots.map(id => doc.getElementById(id)), inline]) {
+        for (const node of [doc.getElementById('meow-panel'), ...roots.map(id => doc.getElementById(id))]) {
             assert.match(window.getComputedStyle(node).fontFamily, /My Font/);
             assert.equal(window.getComputedStyle(node).fontSize, '22px');
             for (const child of node.querySelectorAll('button,textarea,input,select')) assert.match(window.getComputedStyle(child).fontFamily, /My Font/);
         }
+        assert.equal(window.getComputedStyle(inline).fontFamily, 'StoryFont');
         assert.equal(window.getComputedStyle(doc.querySelector('.mes_text')).fontFamily, 'StoryFont');
         handle.destroy(); handle = mountTypography(doc, ext, () => saves++); await tick();
         assert.equal(el('custom').value, 'My Font'); assert.equal(el('size').value, '22');

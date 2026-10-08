@@ -220,13 +220,13 @@ dialog.meow-gift > * { position:relative; }
 #meow-panel #meow-auto-exclusions .meow-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:6px; }
 
 /* 0.9.18: Meow UI typography is independent of the story's decorative font. */
-:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-gift,.meow-inline-card,.meow-be-btn),
-:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift,.meow-inline-card,.meow-be-btn) :not(.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands) {
+:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-gift,.meow-be-btn),
+:root :is(#meow-dialog,#meow-panel,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift,.meow-be-btn) :not(.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands) {
  font-family:var(--meow-font-family,Arial,"Noto Sans","PingFang SC","Microsoft YaHei",sans-serif) !important;
  font-style:normal !important;
  letter-spacing:normal !important;
 }
-:root :is(#meow-dialog,#meow-panel,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-inline-card,.meow-be-btn,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift) {
+:root :is(#meow-dialog,#meow-panel,#meow-open-settings,#meow-wand-button,#meow-top-button,.meow-be-btn,#meow-viewer,#meow-inline-viewer,#meow-tag-editor,#meow-floating,#meow-wand-entry,#meow-selection-dialog,#meow-mask-editor,#meow-gallery-picker,.meow-gift) {
  font-size:var(--meow-font-size,16px) !important;
  line-height:1.5;
 }
