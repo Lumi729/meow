@@ -49,8 +49,16 @@ export function mountTypography(doc, ext, save) {
     };
     const observer = new doc.defaultView.MutationObserver(() => {
         if (queued || current.mode !== 'follow') return; queued = true;
-        doc.defaultView.setTimeout(() => { queued = false; if (current.mode === 'follow') follow(); }, 60);
+        doc.defaultView.setTimeout(() => { queued = false; if (current.mode === 'follow') { follow(); observer.disconnect(); watch(); } }, 150);
     });
+    // Story fonts change with themes, custom CSS or a re-rendered reply, never with each streamed word:
+    // watch page classes/styles, stylesheet edits and the reply list itself, not the whole document.
+    const watch = () => {
+        observer.observe(doc.documentElement, { attributes: true }); observer.observe(doc.body, { attributes: true });
+        observer.observe(doc.head, { childList: true, subtree: true, characterData: true });
+        const chat = doc.getElementById('chat');
+        if (chat) { observer.observe(chat, { childList: true }); const text = chat.querySelector('.mes:not([is_user="true"]) .mes_text') || chat.querySelector('.mes_text'); if (text) observer.observe(text, { attributes: true }); }
+    };
     const fields = () => {
         for (const key of ['mode', 'custom', 'url', 'size']) el(key).value = current[key];
         visibility();
@@ -62,7 +70,7 @@ export function mountTypography(doc, ext, save) {
     function apply(settings, css = '') {
         observer.disconnect(); current = settings; style.textContent = css;
         variable('--meow-font-size', `${current.size}px`);
-        if (current.mode === 'follow') { follow(); observer.observe(doc.documentElement, { childList: true, subtree: true, attributes: true, characterData: true }); }
+        if (current.mode === 'follow') { follow(); watch(); }
         else variable('--meow-font-family', current.mode === 'linked' ? `"MeowLinkedFont",${FALLBACK}` : current.mode === 'custom' ? `${quote(current.custom)},${FALLBACK}` : FONTS[current.mode]);
     }
     async function commit(reset = false, restore = false) {

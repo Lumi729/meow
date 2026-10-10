@@ -45,7 +45,7 @@ test('all Meow surfaces share saved typography, follow story changes and reset i
         assert.equal(el('custom').value, 'My Font'); assert.equal(el('size').value, '22');
         el('mode').value = 'follow'; await apply();
         assert.equal(window.getComputedStyle(inline).fontFamily, 'StoryFont');
-        doc.querySelector('.mes_text').style.fontFamily = 'NewStory'; await tick();
+        doc.querySelector('.mes_text').style.fontFamily = 'NewStory'; await tick(); await tick(); // 150 ms debounce
         assert.equal(window.getComputedStyle(doc.getElementById('meow-tag-editor')).fontFamily, 'NewStory');
         el('mode').value = 'linked'; el('url').value = 'http://invalid.test/font.ttf'; await apply();
         assert.equal(ext.meow_typography.mode, 'follow'); assert.match(el('status').textContent, /未应用字体/);

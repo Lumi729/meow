@@ -1,5 +1,6 @@
 import { buildTagRequest, parseScenes, TAG_PRESET } from './context.js';
 import { combine } from './core.js';
+import { chatOwner, normalizeChatKey, sameChat } from './gallery-context.js';
 
 export function cameraRecords(message){
  const blocks=[...String(message).matchAll(/<tracker_home>\s*([\s\S]*?)<\/tracker_home>/g)];
@@ -28,15 +29,18 @@ export function mountCamera({root,context,chatKey,panel,page,secondary,run,isBus
  const remember=()=>{if(session)writeDraft(cameraIdentity(session),{selected,scenes});};
  const renderTags=()=>{tags.replaceChildren();for(const item of scenes){const record=session?.records.find(r=>r.id===item.source_ids[0]);const label=node('label',record?.title||item.title||'镜头'),input=node('textarea','');input.value=item.prompt;input.rows=4;input.addEventListener('input',()=>{item.prompt=input.value;remember();});label.append(input);tags.append(label);}};
  const action=(title,fn)=>{const b=node('button',title);b.type='button';b.addEventListener('click',async()=>{if(working)return;working=true;const controls=[...view.querySelectorAll('button,input,textarea')].filter(x=>x!==cancelButton);controls.forEach(x=>x.disabled=true);try{await fn();}catch(e){state.textContent=e.name==='AbortError'?'已停止等待，可稍后重试。':e.message;}finally{working=false;controls.forEach(x=>x.disabled=false);}});return b;};
- const valid=s=>{if(!s||s.key!==chatKey()||context().chat[s.index]?.mes!==s.snapshot||!s.frame.isConnected)throw new Error('聊天、原文或监控窗口已变化，请从原监控入口重新打开。');};
+ const here=()=>({key:chatKey(),owner:chatOwner(context())});
+ const valid=s=>{if(!s||!sameChat(s,here())||context().chat[s.index]?.mes!==s.snapshot||!s.frame.isConnected)throw new Error('聊天、原文或监控窗口已变化，请从原监控入口重新打开。');};
  const reply=(s,type,extra={})=>{valid(s);s.target.postMessage({type,requestId:s.requestId,...extra},s.origin==='null'?'*':s.origin);};
- const cameraIdentity=s=>JSON.stringify([s.key,s.index,s.records.map(r=>r.text)]);
+ const cameraIdentity=s=>JSON.stringify([normalizeChatKey(s.key),s.index,s.records.map(r=>r.text)]);
+ // Older pictures were saved with 0 or "0" and a character index that may have moved since.
+ const sameCamera=(e,s)=>{if(!e?.cameraKey)return false;try{const [key,index,texts]=JSON.parse(e.cameraKey);return index===s.index&&JSON.stringify(texts)===JSON.stringify(s.records.map(r=>r.text))&&sameChat({key,owner:e.chatOwner},s);}catch{return false;}};
  // Tapping a picture on the monitor screen opens Meow's big viewer (redraw / delete live there), no extra buttons on the screen.
  const hooked=new WeakSet();
  const hook=s=>{let doc;try{doc=s.frame.contentDocument;}catch{return;}if(!doc||hooked.has(doc))return;hooked.add(doc);
   doc.addEventListener('click',e=>{const img=e.target?.closest?.('img');if(!img)return;const src=img.getAttribute('src');const entry=src&&listImages().find(x=>x.cameraKey&&x.src===src);if(!entry)return;e.preventDefault();e.stopImmediatePropagation();viewEntry?.(entry.id);},true);};
  const publish=s=>{hook(s);return send(s);};
- const send=s=>reply(s,'meow-camera-images',{images:listImages().filter(e=>e.cameraKey===cameraIdentity(s)).map(e=>({id:e.id,src:e.src,title:e.title,record:e.source[0]?.text||''}))});
+ const send=s=>reply(s,'meow-camera-images',{images:listImages().filter(e=>sameCamera(e,s)).map(e=>({id:e.id,src:e.src,title:e.title,record:e.source[0]?.text||''}))});
  const generation=action('② 用这些 tags 生成监控画面',()=>run(async signal=>{
   const s=session;valid(s);if(!scenes.length)throw new Error('先勾选镜头并生成 tags。');
   const batch=structuredClone(scenes),base=config();
@@ -44,7 +48,7 @@ export function mountCamera({root,context,chatKey,panel,page,secondary,run,isBus
    valid(s);signal.throwIfAborted();state.textContent=`正在生成镜头 ${i+1}/${batch.length}，完成后回传…`;
    const item=batch[i],record=s.records.find(r=>r.id===item.source_ids[0]);
    const payload=prepare({...base,prompt:combine(item.prompt,'security camera perspective, wide angle, non-explicit scene'),extra_negative:combine(base.extra_negative,item.negative_prompt,'nudity, explicit sexual content')});
-   const src=await png(payload,signal),entry=makeEntry(src,payload,[{id:record.id,messageIndex:s.index,name:context().chat[s.index]?.name||'野火视窗',part:record.title,text:record.text}],record.title,s.key);
+   const src=await png(payload,signal),entry=makeEntry(src,payload,[{id:record.id,messageIndex:s.index,name:context().chat[s.index]?.name||'野火视窗',part:record.title,text:record.text}],record.title,s.key,s.owner);
    entry.cameraKey=cameraIdentity(s);entry.scene={prompt:combine(item.prompt,'security camera perspective, wide angle, non-explicit scene'),negative_prompt:combine(item.negative_prompt,'nudity, explicit sexual content'),characters:null};await addImage(entry);valid(s);publish(s);
   }
   state.textContent='画面已返回野火监控屏，也已保存到图库。点击下方返回查看。';
@@ -76,10 +80,10 @@ export function mountCamera({root,context,chatKey,panel,page,secondary,run,isBus
    const snapshot=context().chat[index]?.mes,records=cameraRecords(snapshot);
    if(!records.length||records.length>30)throw new Error('没有可用住宅记录，或记录过多。');
    if(!Array.isArray(d.records)||JSON.stringify(d.records)!==JSON.stringify(records.map(r=>r.text)))throw new Error('监控记录与当前楼层不同，请刷新该楼层。');
-   s={index,snapshot,records,key:chatKey(),frame,target:e.source,origin:e.origin,requestId:d.requestId};
+   s={index,snapshot,records,...here(),frame,target:e.source,origin:e.origin,requestId:d.requestId};
    sessions.set(cameraIdentity(s),s);
    if(['meow-camera-view','meow-camera-redraw','meow-camera-delete'].includes(d.type)){
-    const entry=listImages().find(x=>x.id===d.id&&x.cameraKey===cameraIdentity(s));if(!entry)throw new Error('这张画面已不在猫猫图库里，请点「读取已存画面」刷新。');
+    const entry=listImages().find(x=>x.id===d.id&&sameCamera(x,s));if(!entry)throw new Error('这张画面已不在猫猫图库里，请点「读取已存画面」刷新。');
     if(d.type==='meow-camera-view'){viewEntry(entry.id);return;}
     if(d.type==='meow-camera-delete'){await removeEntry(entry);publish(s);reply(s,'meow-camera-status',{message:'画面已删除。'});return;}
     if(isBusy())throw new Error('猫猫正在忙，请稍后再重绘。');
@@ -98,6 +102,6 @@ export function mountCamera({root,context,chatKey,panel,page,secondary,run,isBus
  };
  window.addEventListener('message',receive);
  // Gallery edits (delete / redraw from the big viewer) refresh an open monitor screen too.
- const notify=key=>{const s=sessions.get(key);if(!s)return;try{publish(s);}catch{sessions.delete(key);}};
+ const notify=entry=>{for(const [id,s] of sessions){if(!sameCamera(entry,s))continue;try{publish(s);}catch{sessions.delete(id);}}};
  return {notify,dispose:()=>{window.removeEventListener('message',receive);view.remove();}};
 }

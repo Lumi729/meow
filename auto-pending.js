@@ -1,5 +1,7 @@
 import { sceneAnchor, sceneQuoteOptions } from './context.js';
 import { stripInline } from './inline.js';
+import { chatOwner } from './gallery-context.js';
+import { watchChat } from './chat-watch.js';
 
 // Independent of the manual Bad Cat draft. Never sends tags or images on restore.
 export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTags, generate, report, inline }) {
@@ -7,20 +9,28 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     let records = [], storageError = '';
     const slots = new Map(), hydrated = new WeakSet(), messages = new Map();
     const validRecord = r => r?.id && typeof r.item?.prompt === 'string' && Array.isArray(r.item.source);
-    const identity = () => {
-        const c = context(), chat = c.getCurrentChatId?.();
-        if (!chat) return null;
-        const owner = c.groupId != null ? ['group', String(c.groupId)] : c.characters?.[c.characterId]?.avatar ? ['character', c.characters[c.characterId].avatar] : null;
-        return owner ? JSON.stringify([...owner, String(chat)]) : null;
+    const identity = () => chatOwner(context());
+    const sameLegacyKey = (key, current) => {
+        if (key === current) return true;
+        try { const a = JSON.parse(key), b = JSON.parse(current); return Array.isArray(a) && Array.isArray(b) && a.length === 3 && b.length === 3 && a.every((v, i) => v == null ? b[i] == null : b[i] != null && String(v) === String(b[i])); } catch { return false; }
     };
-    const sameLegacyKey = key => {
-        if (key === chatKey()) return true;
-        try { const a = JSON.parse(key), b = JSON.parse(chatKey()); return Array.isArray(a) && Array.isArray(b) && a.length === 3 && b.length === 3 && a.every((v, i) => v == null ? b[i] == null : b[i] != null && String(v) === String(b[i])); } catch { return false; }
+    // Look up the current chat once per pass instead of once per record.
+    const ownedBy = () => { const owner = identity(), key = chatKey(); return r => r.owner ? r.owner === owner : sameLegacyKey(r.key, key); };
+    const belongs = r => ownedBy()(r);
+    // The chat file copy drops each source's messageSnapshot when it equals record.snapshot; hydrate puts it back.
+    const chatCopy = r => {
+        const { confirmed, ...rest } = r, copy = structuredClone(rest);
+        for (const source of copy.item.source) if (source.messageSnapshot !== undefined && source.messageSnapshot === copy.snapshot) { delete source.messageSnapshot; source.snapshotFromRecord = true; }
+        return copy;
     };
-    const belongs = r => r.owner ? r.owner === identity() : sameLegacyKey(r.key);
+    const fromChat = saved => {
+        const record = structuredClone(saved);
+        for (const source of record.item.source) if (source.snapshotFromRecord) { delete source.snapshotFromRecord; source.messageSnapshot = record.snapshot; }
+        return record;
+    };
     const relocate = () => {
         const chat = context().chat || [];
-        for (const record of records.filter(belongs)) {
+        for (const record of records.filter(ownedBy())) {
             const message = messages.get(record.id), index = message ? chat.indexOf(message) : -1;
             if (index < 0 || index === record.index) continue;
             const previous = record.index; record.index = index;
@@ -29,30 +39,50 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     };
     try { const saved = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (Array.isArray(saved)) records = saved.filter(validRecord); } catch { storageError = '旧的待处理记录无法读取。'; }
     const node = (tag, text = '') => { const el = document.createElement(tag); el.textContent = text; return el; };
-    let chatSaveError = '';
+    let chatSaveError = '', inChat = new Set();
     const showStorage = () => { const target = root.querySelector('#meow-auto-pending-storage'); if (target) target.textContent = [storageError, chatSaveError].filter(Boolean).join(' '); };
     const save = () => {
         hydrate(false);
         relocate();
         // Keep a durable copy beside the reply, just like completed illustrations.
-        const c = context(), key = chatKey();
-        for (const r of records.filter(belongs)) { r.key = key; r.owner ||= identity(); }
+        const c = context(), key = chatKey(), mine = ownedBy(), own = records.filter(mine), written = [];
+        for (const r of own) { r.key = key; r.owner ||= identity(); }
         let changed = false;
         for (const [index, message] of (c.chat || []).entries()) {
-            const saved = records.filter(r => belongs(r) && r.index === index &&
-                (messages.has(r.id) ? messages.get(r.id) === message : stripInline(message.mes) === r.snapshot)).map(r => structuredClone(r));
+            const here = own.filter(r => r.index === index && (messages.has(r.id) ? messages.get(r.id) === message : stripInline(message.mes) === r.snapshot));
+            const saved = here.map(chatCopy);
+            here.forEach((r, i) => written.push([r, JSON.stringify(saved[i])]));
             if (!saved.length && !message.extra?.meow_pending) continue;
             if (JSON.stringify(message.extra?.meow_pending || []) === JSON.stringify(saved)) continue;
             message.extra ??= {}; message.extra.meow_pending = saved; changed = true;
         }
-        if (changed && c.saveChat) {
-            try { Promise.resolve(c.saveChat()).then(() => { chatSaveError = ''; showStorage(); }, () => { chatSaveError = '待生图框未能保存到聊天，请检查酒馆连接；本地 tags 仍保留。'; showStorage(); }); }
-            catch { chatSaveError = '待生图框未能保存到聊天，请检查酒馆连接；本地 tags 仍保留。'; }
+        // A record no longer written beside any reply (reply deleted) is not in the chat file any more.
+        inChat = new Set(written.map(([r]) => r));
+        for (const r of own) if (!inChat.has(r)) delete r.confirmed;
+        if ((changed || written.some(([r, copy]) => r.confirmed !== copy)) && c.saveChat) {
+            const failed = () => { const first = !chatSaveError; chatSaveError = '待生图框未能保存到聊天，请检查酒馆连接；浏览器里的备份仍保留，不会清理。'; showStorage(); if (first) report(chatSaveError); };
+            // Only a confirmed chat save lets this exact copy leave browser storage later.
+            try { Promise.resolve(c.saveChat()).then(() => { chatSaveError = ''; for (const [r, copy] of written) if (inChat.has(r)) r.confirmed = copy; backup(); }, failed); }
+            catch { failed(); }
         }
-        try { localStorage.setItem(storageKey, JSON.stringify(records)); storageError = ''; }
-        catch { storageError = '待处理记录暂存失败，请先处理或复制 tags；刷新后可能丢失。'; }
-        showStorage();
+        backup();
     };
+    // Browser backup of every record. Another chat's record leaves it only after its chat file
+    // confirmed this exact copy; unconfirmed and pre-0.9.45 browser-only records always stay.
+    function backup() {
+        const mine = ownedBy();
+        for (const r of records.filter(r => !mine(r) && r.owner && r.confirmed && r.confirmed === JSON.stringify(chatCopy(r)))) {
+            messages.delete(r.id); slots.get(r.id)?.remove(); slots.delete(r.id);
+        }
+        records = records.filter(r => mine(r) || !r.owner || !r.confirmed || r.confirmed !== JSON.stringify(chatCopy(r)));
+        try { localStorage.setItem(storageKey, JSON.stringify(records)); storageError = ''; }
+        catch {
+            const first = !storageError;
+            storageError = '待生图记录的浏览器备份写入失败（存储空间可能已满）。已保存到聊天的框不受影响，但请尽快生成或复制 tags，并清理浏览器空间。';
+            if (first) report(storageError);
+        }
+        showStorage();
+    }
     const exists = record => { if (!records.includes(record)) throw new Error('这组待处理 tags 已移除，请重新打开。'); if (!belongs(record)) throw new Error('请切回这组 tags 的来源聊天。'); };
     const verify = record => {
         exists(record); const message = context().chat[record.index];
@@ -82,7 +112,7 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
                 if (!validRecord(saved)) continue;
                 let record = records.find(r => r.id === saved.id && belongs(r));
                 if (!record) {
-                    record = structuredClone(saved);
+                    record = fromChat(saved);
                     if (records.some(r => r.id === record.id)) record.id = crypto.randomUUID();
                     records.push(record);
                 }
@@ -97,16 +127,19 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
                 messages.set(record.id, message); changed = true;
             }
         }
-        for (const record of records) if (belongs(record) && record.key !== chatKey()) { record.key = chatKey(); changed = true; }
+        const mine = ownedBy(), key = chatKey();
+        for (const record of records) if (record.key !== key && mine(record)) { record.key = key; changed = true; }
         if (changed && persist) save();
     }
     function restoreInline() {
         relocate();
         hydrate();
         if (!inline) return;
-        for (const record of records) {
+        // Only this chat's records need a handle; drop the rest without checking them.
+        const mine = records.filter(ownedBy()).filter(r => r.inline), live = new Set(mine.map(r => r.id));
+        for (const [id, slot] of slots) if (!live.has(id)) { slot.remove(); slots.delete(id); }
+        for (const record of mine) {
             // Recreate handles after a chat switch, message edit or reply branch change.
-            if (!record.inline || !belongs(record)) { slots.get(record.id)?.remove(); slots.delete(record.id); continue; }
             try {
                 verify(record);
                 if (slots.get(record.id)?.alive()) continue;
@@ -121,7 +154,7 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
     }
     function render() {
         restoreInline();
-        list.replaceChildren(); const visible = records.filter(belongs);
+        list.replaceChildren(); const visible = records.filter(ownedBy());
         root.querySelector('#meow-auto-pending-count').textContent = `${visible.length} 张`;
         showStorage();
         if (!visible.length) { list.append(node('p', '没有未完成的场景。')); return; }
@@ -154,14 +187,7 @@ export function mountAutoPending({ root, scope, context, chatKey, isBusy, editTa
         if (events[name]) context().eventSource.on(events[name], restoreInline);
     }
     // The chat renderer may replace message objects after its initial event.
-    const chat = document.querySelector('#chat');
-    if (chat) {
-        let queued = false;
-        new document.defaultView.MutationObserver(() => {
-            if (queued) return; queued = true;
-            queueMicrotask(() => { queued = false; restoreInline(); });
-        }).observe(chat, { childList: true, subtree: true });
-    }
+    watchChat(context, () => restoreInline());
     render();
     return {
         add(data) { hydrate(); const record = { ...structuredClone(data), owner: identity(), id: crypto.randomUUID() }; records.push(record); const message = context().chat?.[record.index]; if (message) messages.set(record.id, message); save(); render(); root.querySelector('#meow-auto-pending').open = true; return record; },

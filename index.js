@@ -1,5 +1,5 @@
 import { recoverChatGallery } from './gallery-recovery.js';
-import { galleryForChat } from './gallery-context.js';
+import { galleryForChat, chatOwner, normalizeChatKey } from './gallery-context.js';
 import { panelThemeCSS } from './story-theme.js';
 import { mountCorners } from './corners.js';
 import { mountAutoPending } from './auto-pending.js';
@@ -282,7 +282,7 @@ export async function init(){
  if(measured)timing(`${measured.route} · 请求及下载 ${seconds(measured.requestMs)} 秒 · 解码 ${seconds(measured.decodeMs)} 秒 · 保存 ${seconds(saved-started)} 秒${entry.unsaved?'（失败，请下载）':''}`);
  };
 
- const makeEntry=(src,payload,source=[],title='星绘',key=chatKey())=>({id:crypto.randomUUID(),created:Date.now(),src,payload:structuredClone(payload),source:structuredClone(source),title,chatKey:key,bad:source.length>0});
+ const makeEntry=(src,payload,source=[],title='星绘',key=chatKey(),owner=chatOwner(ctx()))=>({id:crypto.randomUUID(),created:Date.now(),src,payload:structuredClone(payload),source:structuredClone(source),title,chatKey:key,...(owner?{chatOwner:owner}:{}),bad:source.length>0});
  el('draw-count').value=ext.meow_draw_count||1;
  on('draw-count',()=>{ext.meow_draw_count=numberIn(el('draw-count').value,1,20,'图片数');save();},'change');
  on('generate',()=>run(async signal=>{
@@ -326,8 +326,8 @@ export async function init(){
  function showImage(id,origin=null){const entry=images.find(x=>x.id===id);if(!entry)return;viewing=id;viewerOrigin=origin;if(origin&&origin!=='camera'){previewIds[origin]=id;renderPreviews();save();}zoom=false;renderViewer(entry);if(!viewer.open)viewer.showModal();}
  const escapeText=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const reseed=entry=>{const payload=structuredClone(entry.payload);payload.seed=crypto.getRandomValues(new Uint32Array(1))[0];if(payload.direct)payload.direct.parameters.seed=payload.seed;return payload;};
- async function redrawEntry(entry,signal){if(entry.payload.director)throw new Error('导演工具的结果不能重绘，请对原图再用一次工具。');const payload=entry.bad||entry.scene?await redrawPayload(entry,signal):reseed(entry);status('正在重绘…');const src=await png(payload,signal);const next=makeEntry(src,payload,entry.source,entry.title,entry.chatKey);next.insertionSource=entry.insertionSource;next.cameraKey=entry.cameraKey;next.scene=entry.scene||(entry.bad?guessScene(entry.payload):null)||undefined;await addImage(next);camera?.notify(next.cameraKey);status('重绘完成，已存入图库。');return next;}
- async function removeEntry(entry){const list=viewer.open&&viewing===entry.id?viewerList().filter(x=>x.id!==entry.id):null;await store.remove(entry.id);images=images.filter(x=>x.id!==entry.id);renderGallery();renderPreviews();if(list){if(list.length)showImage(list[0].id,viewerOrigin);else viewer.close();}camera?.notify(entry.cameraKey);}
+ async function redrawEntry(entry,signal){if(entry.payload.director)throw new Error('导演工具的结果不能重绘，请对原图再用一次工具。');const payload=entry.bad||entry.scene?await redrawPayload(entry,signal):reseed(entry);status('正在重绘…');const src=await png(payload,signal);const next=makeEntry(src,payload,entry.source,entry.title,entry.chatKey,entry.chatOwner??null);next.insertionSource=entry.insertionSource;next.cameraKey=entry.cameraKey;next.scene=entry.scene||(entry.bad?guessScene(entry.payload):null)||undefined;await addImage(next);camera?.notify(next);status('重绘完成，已存入图库。');return next;}
+ async function removeEntry(entry){const list=viewer.open&&viewing===entry.id?viewerList().filter(x=>x.id!==entry.id):null;await store.remove(entry.id);images=images.filter(x=>x.id!==entry.id);renderGallery();renderPreviews();if(list){if(list.length)showImage(list[0].id,viewerOrigin);else viewer.close();}camera?.notify(entry);}
  let camera=null,tools=null;
  const inline=mountInline({context:ctx,chatKey,report:status,editTags:(variant,source,key)=>openImageTagEditor(images.find(x=>x.id===variant.id)||{...variant,source:[source],insertionSource:source,chatKey:key,src:variant.path},source,key),upload:entry=>saveBase64AsFile(entry.src.split(',')[1],'meow',entry.id,'png'),generate:index=>{if(busy)throw new Error('猫猫正在忙，请稍后再生成。');secondary.output='chat';el('output').value='chat';save();captureTarget=index;panel.open();document.querySelector('[data-page="bad"]').click();el('capture').click();},redraw:async(variant,source,key)=>{let result;await run(async signal=>{const original=images.find(x=>x.id===variant.id)||variant;const payload=await redrawPayload(original,signal);const src=await png(payload,signal);result=makeEntry(src,payload,[source],original.title||variant.title,key);result.scene=original.scene||guessScene(original.payload)||undefined;await addImage(result);});return result;}});
  async function insert(entry){return inline.insert(entry);}
@@ -346,11 +346,11 @@ export async function init(){
  function moveImage(delta){const list=viewerList();if(!list.length)return;const i=list.findIndex(x=>x.id===viewing);showImage(list[(Math.max(0,i)+delta+list.length)%list.length].id,viewerOrigin);}
  viewer.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();moveImage(1);}if(e.key==='ArrowLeft'){e.preventDefault();moveImage(-1);}});
  const selected=()=>parts.filter(p=>p.selected&&p.text.trim());
- let manualPreview=false,draftTimer=0,draftKey=null;
+ let manualPreview=false,draftTimer=0,draftKey=null,draftError=false;
  const DRAFTS='meow-bad-drafts';
  const readDrafts=()=>{try{return JSON.parse(localStorage.getItem(DRAFTS)||'{}')||{};}catch{return {};}};
  // Captured text, typed preview and returned tags survive closing the panel, switching apps or reloading.
- const flushDraft=()=>{clearTimeout(draftTimer);draftTimer=0;const key=draftKey;if(!key)return;try{const all=readDrafts(),preview=el('send-preview').value;if(!parts.length&&!scenes.length&&!preview.trim())delete all[key];else all[key]={at:Date.now(),parts,scenes,manual:manualPreview,preview,raw:el('raw-tags').value};for(const k of Object.keys(all).sort((a,b)=>all[b].at-all[a].at).slice(8))delete all[k];localStorage.setItem(DRAFTS,JSON.stringify(all));}catch{}};
+ const flushDraft=()=>{clearTimeout(draftTimer);draftTimer=0;const key=draftKey;if(!key)return;try{const all=readDrafts(),preview=el('send-preview').value;if(!parts.length&&!scenes.length&&!preview.trim())delete all[key];else all[key]={at:Date.now(),parts,scenes,manual:manualPreview,preview,raw:el('raw-tags').value};for(const k of Object.keys(all).sort((a,b)=>all[b].at-all[a].at).slice(8))delete all[k];localStorage.setItem(DRAFTS,JSON.stringify(all));draftError=false;}catch{if(!draftError)status('坏猫猫草稿保存失败（浏览器存储可能已满），刷新后可能丢失；请先复制 tags 或清理浏览器空间。');draftError=true;}};
  const saveDraft=()=>{draftKey??=chatKey();clearTimeout(draftTimer);draftTimer=setTimeout(flushDraft,300);};
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&draftTimer)flushDraft();});
  const loadDraft=()=>{draftKey=chatKey();const d=readDrafts()[draftKey];parts=Array.isArray(d?.parts)?d.parts:[];scenes=Array.isArray(d?.scenes)?d.scenes:[];manualPreview=!!d?.manual;capture=parts.length||manualPreview?{key:chatKey()}:null;renderParts();el('context-summary').textContent=parts.length?`已捕捉 ${parts.length} 段 · 已选 ${selected().length} 段`:'还没有捕捉';el('send-preview').value=d?.preview??'';el('raw-tags').value=d?.raw??'';renderScenes();if(scenes.length||parts.length)status(scenes.length?'已恢复上次的 tags，可直接生成图片。':'已恢复上次捕捉的原文。');};
@@ -362,7 +362,9 @@ export async function init(){
  el('scenes').addEventListener('input',saveDraft);el('scenes').addEventListener('change',saveDraft);
  function renderParts(){const originals=new Map();for(const p of parts)if(!originals.has(p.messageIndex))originals.set(p.messageIndex,p.messageSnapshot??ctx().chat?.[p.messageIndex]?.mes??'');el('capture-original').value=[...originals].map(([i,text])=>`第 ${i+1} 条原始回复\n${text}`).join('\n\n');el('context-box').open=false;el('context-list').replaceChildren();for(const p of parts){const card=textNode('div','','meow-source');const label=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=p.selected;input.addEventListener('change',()=>{p.selected=input.checked;selectionPreview();});label.append(input,document.createTextNode(`${p.name} · 第 ${p.messageIndex+1} 条 · ${p.part}`));const body=document.createElement('textarea');body.value=p.text;body.rows=4;body.setAttribute('aria-label',`${p.id} 待发送原文`);const originalAnchor=p.originalAnchor??=p.anchorText,originalStart=p.originalStart??=p.anchorStart;body.addEventListener('input',()=>{p.text=body.value;const chosen=p.text.trim(),at=originalAnchor.indexOf(chosen);if(chosen&&at>=0&&originalAnchor.indexOf(chosen,at+1)<0){p.anchorText=chosen;p.anchorStart=originalStart+at;}else{p.anchorText=originalAnchor;p.anchorStart=originalStart;}selectionPreview();});card.append(label,body);el('context-list').append(card);}}
  const readCaptureRules=()=>{let rules;try{rules=JSON.parse(secondary.rules);}catch{throw new Error('分区规则不是有效 JSON。');}if(!Array.isArray(rules)||rules.length>20||rules.some(r=>!r||typeof r.name!=='string'||typeof r.start!=='string'||typeof r.end!=='string'))throw new Error('每条规则需要 name、start 和 end，最多 20 条。');return rules;};
- on('capture',()=>{if(!ctx().getCurrentChatId())throw new Error('请先打开一个聊天。');const count=numberIn(secondary.context_count,1,50,'上下文条数');const rules=readCaptureRules();parts=captureContext(ctx().chat,captureTarget===null?count:ctx().chat.length,rules);if(captureTarget!==null){parts=parts.filter(p=>p.messageIndex===captureTarget);captureTarget=null;}capture={key:chatKey()};renderParts();selectionPreview();status(parts.length?'已捕捉。请勾选要发送的部分；可在框内删去不想发送的文字。':'没有可用原文。');});
+ on('capture',()=>{const target=captureTarget;try{if(!ctx().getCurrentChatId())throw new Error('请先打开一个聊天。');const count=numberIn(secondary.context_count,1,50,'上下文条数');const rules=readCaptureRules();
+  // A reply button only needs that one reply parsed, not the whole chat.
+  parts=target===null?captureContext(ctx().chat,count,rules):captureContext(ctx().chat.slice(0,target+1),1,rules).filter(p=>p.messageIndex===target);}finally{captureTarget=null;}capture={key:chatKey()};renderParts();selectionPreview();status(parts.length?'已捕捉。请勾选要发送的部分；可在框内删去不想发送的文字。':'没有可用原文。');});
  const runTags=async(signal,countOverride,originalContext='')=>{const typed=el('send-preview').value.trim(),manual=manualPreview&&!!typed;if(manual)capture={key:chatKey()};else if(!capture)throw new Error('请先点①捕捉聊天，或直接在「将发送的原文预览」里写内容。');checkChat();if(!secondary.secret_id)throw new Error('请先配置副 API 密钥。');const count=numberIn(countOverride??secondary.image_count,1,20,'图片数');const withCharacters=!!secondary.character_mode;
  const chosen=manual?[{id:'manual',messageIndex:null,name:'手写',part:'预览框内容',text:typed}]:structuredClone(selected());const request=buildTagRequest({...secondary,appearance:await getAppearance(),original_context:originalContext},chosen,count);if(JSON.stringify(request).length>150000)throw new Error('选中上下文太长，请减少条数或删减内容（最多 150 KB）。');status('正在把勾选原文发给副 API…');const timeout=setTimeout(()=>controller?.abort(),120000);let data;try{const r=await fetch('/api/backends/chat-completions/generate',{method:'POST',headers:ctx().getRequestHeaders(),body:JSON.stringify(request),signal});if(!r.ok)throw new Error(`副 API 失败（HTTP ${r.status}），请检查地址、密钥和模型。`);data=await r.json();}finally{clearTimeout(timeout);}const raw=data.choices?.[0]?.message?.content;if(data.choices?.[0]?.finish_reason==='length'){el('raw-tags').value=typeof raw==='string'?raw:'';throw new Error('副 API 输出被截断，JSON 不完整。请减少本轮图片数或缩短预设要求后重试。');}if(typeof raw!=='string')throw new Error('副 API 返回缺少 choices[0].message.content。');el('raw-tags').value=raw;checkChat();scenes=parseScenes(raw,chosen.map(p=>p.id),count,withCharacters).map(s=>({...s,source:chosen.filter(p=>s.source_ids.includes(p.id))}));renderScenes();saveDraft();status(manual?'tags 已返回。预览框手写内容生成的图会放进图文相册，不插入正文。':'tags 已返回，检查或修改后再点生成图片。');};
  on('tags',()=>run(signal=>runTags(signal)));
@@ -395,7 +397,7 @@ export async function init(){
   const scene={...structuredClone(extracted),title:entry.title||'未命名场景'};
   const ensureSource=()=>{
    if(!inlineSource)return;
-   if(inlineKey!==chatKey())throw new Error('聊天已切换，请回到原图后再修改。');
+   if(normalizeChatKey(inlineKey)!==normalizeChatKey(chatKey()))throw new Error('聊天已切换，请回到原图后再修改。');
    const message=ctx().chat[inlineSource.messageIndex];if(!message)throw new Error('来源消息已删除。');anchorEnd(message,inlineSource);
   };
   imageTagEditor.open({scene,onStop:()=>{stopping=true;controller?.abort();},
@@ -404,10 +406,10 @@ export async function init(){
     const current=images.find(x=>x.id===entry.id);
     if(wasInGallery&&!current)throw new Error('这张图片已从图库删除，请重新打开图片。');
     if(current){const next={...current,title:edited.title,scene:structuredClone(edited)};await store.put(next);Object.assign(current,next);entry=current;}
-    const synced=await inline.updateTags(entry.id,edited,entry.chatKey);
+    const synced=await inline.updateTags(entry.id,edited,entry.chatKey,entry.chatOwner);
     if(!current&&!synced)throw new Error('找不到这张图片的记录，未保存。');
     entry.scene=structuredClone(edited);entry.title=edited.title;
-    renderGallery();renderPreviews();if(viewer.open&&viewing===entry.id)renderViewer(entry);camera?.notify(entry.cameraKey);
+    renderGallery();renderPreviews();if(viewer.open&&viewing===entry.id)renderViewer(entry);camera?.notify(entry);
    },
    onRedraw:entry.payload.director?null:()=>run(async signal=>{
     ensureSource();const next=await redrawEntry(entry,signal);
@@ -477,7 +479,7 @@ export async function init(){
   generate:(record,verify,onEntry)=>run(async signal=>{
    const check=()=>{signal.throwIfAborted();if(stopping)throw new DOMException('已停止','AbortError');verify();};check();
    const anchor=sceneAnchor(record.item,record.item.source),existing=record.entryId&&images.find(entry=>entry.id===record.entryId);
-   if(existing){await inline.insert({...existing,chatKey:record.key},[anchor]);check();return;}
+   if(existing){await inline.insert({...existing,chatKey:record.key,chatOwner:record.owner},[anchor]);check();return;}
    if(record.entryId)throw new Error('已生成图片不在图库中；请先保存 tags，再重新生成这一张。');
    await runBadGenerate(signal,{items:[record.item],key:record.key,check,retry:{retries:numberIn(secondary.auto_retries,0,5,'自动重试次数')},ordinal:record.ordinal,total:record.total,slots:[null],onEntry});
   })});
