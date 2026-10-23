@@ -59,7 +59,7 @@ export function placeAfterQuote(body,quote,card,source={}){
  if(highlight){const tail=doc.createRange();tail.setStart(hit.n,end-hit.start);tail.setEnd(highlight,highlight.childNodes.length);if(!tail.toString().trim()){highlight.after(card);return true;}}
  range.insertNode(card);return true;
 }
-export function mountInline({context,chatKey,upload,generate,redraw,editTags,report}){
+export function mountInline({showMessageButton=()=>true,context,chatKey,upload,generate,redraw,editTags,report}){
  const placeholders=new Map();inlineTheme(document);
  const here=()=>({key:chatKey(),owner:chatOwner(context())}),current=(key,owner)=>sameChat({key,owner},here());
  let viewing=null,mutating=false;const mounted=new Map(),redrawing=new Set();
@@ -91,6 +91,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
   return {alive:()=>placeholders.has(id)&&current(key)&&context().chat[source.messageIndex]===message&&(message.swipe_id??0)===item.swipe&&stripInline(message.mes)===source.messageSnapshot,hasRetry:()=>!!item.retry,retry(fn,label='重新生这张图'){item.retry=fn;item.retryLabel=label;item.card?.remove();item.card=null;decorate();},update(text){item.status=text;if(item.card){item.card.title=text;if(!item.retry)item.card.querySelector('button').textContent=/重试/.test(text)?'重试中…':/正在/.test(text)?'生成中…':'等待生成';}},remove(){item.card?.remove();placeholders.delete(id);}};
  }
  function decorate(nodes=null){
+  if(!showMessageButton())document.querySelectorAll('#chat .meow-message-generate').forEach(button=>button.remove());
   for(const [id,item] of placeholders){
    const {source,message,key,swipe}=item;
    if(!current(key)||context().chat[source.messageIndex]!==message||(message.swipe_id??0)!==swipe||stripInline(message.mes)!==source.messageSnapshot){item.card?.remove();placeholders.delete(id);continue;}
@@ -105,7 +106,7 @@ export function mountInline({context,chatKey,upload,generate,redraw,editTags,rep
   for(const [id,card] of mounted){const message=context().chat[Number(card.dataset.message)],g=message?.extra?.meow_inline?.find(x=>x.id===id);if(!card.isConnected||!current(card.dataset.chat,card.dataset.owner)||!g||!active(message,g)){card.remove();mounted.delete(id);}}
   (nodes?nodes.filter(node=>node.matches('.mes[mesid]')):document.querySelectorAll('#chat .mes[mesid]')).forEach(node=>{const index=Number(node.getAttribute('mesid')),message=context().chat[index];if(!message||message.is_system||message.extra?.meow)return;const body=node.querySelector('.mes_text');if(!body)return;
    // Keep the text container untouched on messages without images: iframe renderers depend on it.
-   const host=body.parentElement;if(!host.querySelector(':scope > .meow-message-generate')){const b=button('ฅ 给这段正文生成图片',()=>generate(Number(node.getAttribute('mesid'))));b.className='menu_button meow-message-generate';host.append(b);}
+   const host=body.parentElement;if(showMessageButton()&&!host.querySelector(':scope > .meow-message-generate')){const b=button('ฅ 给这段正文生成图片',()=>generate(Number(node.getAttribute('mesid'))));b.className='menu_button meow-message-generate';host.append(b);}
    const groups=(message.extra?.meow_inline??[]).filter(g=>active(message,g));
    for(const group of groups){let card=mounted.get(group.id);const variant=group.variants[group.active];if(!variant)continue;
     if(!card){const target={...here(),index,id:group.id};card=document.createElement('span');card.className='meow-inline-card';card.dataset.message=index;card.dataset.chat=target.key;if(target.owner)card.dataset.owner=target.owner;card.dataset.group=group.id;

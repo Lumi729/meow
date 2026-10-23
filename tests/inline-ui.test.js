@@ -61,3 +61,18 @@ test('pending illustration updates, survives rerender, becomes image and clears 
  app.placeholder(source,key);key='other';app.decorate();assert.equal(document.querySelectorAll('.meow-inline-pending').length,0);
  await w.happyDOM.abort();
 });
+
+test('message entry toggle removes existing buttons and prevents new ones, then restores without duplicates',async()=>{
+ const w=new Window();globalThis.document=w.document;
+ document.body.innerHTML='<div id="chat"><div class="mes" mesid="0"><div class="mes_text">正文<img id="existing" src="/existing.png"></div></div></div>';
+ const c={chat:[{mes:'正文'}],event_types:{},eventSource:{on(){}}};let enabled=true;
+ const image=document.querySelector('#existing');
+ const app=mountInline({context:()=>c,chatKey:()=> 'chat',showMessageButton:()=>enabled,generate(){},report(){}});
+ assert.equal(document.querySelectorAll('.meow-message-generate').length,1);
+ enabled=false;app.decorate();assert.equal(document.querySelectorAll('.meow-message-generate').length,0);
+ c.chat.push({mes:'新正文'});document.querySelector('#chat').insertAdjacentHTML('beforeend','<div class="mes" mesid="1"><div class="mes_text">新正文</div></div>');
+ app.decorate();assert.equal(document.querySelectorAll('.meow-message-generate').length,0);
+ assert.equal(document.querySelector('#existing'),image);
+ enabled=true;app.decorate();app.decorate();assert.equal(document.querySelectorAll('.meow-message-generate').length,2);
+ await w.happyDOM.close();
+});
